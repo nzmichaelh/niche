@@ -1,0 +1,24 @@
+$def with (links)
+
+$ last_date = None
+
+$for link in links:
+    $ date = model.to_datestr(link.timestamp)
+    $if date != last_date:
+        <h2>
+	  <a href="/daily/$model.to_date_link(link.timestamp)">$date</a></h2>
+	$ last_date = date
+
+    $if not link.URL:
+        <b>$link.title</b>
+    $else:
+        <a href="$link.URL">$link.URL_description</a>
+    $:link.description
+    $if link.extended:
+        [<a href="/link/$link.linkID">more inside</a>]
+    <p>
+    $ user = model.get_user(link.userID)
+    posted by <a href="/user/$user.username">$user.username</a> -
+    $ comments = model.get_comments(link.linkID)
+    <a href="/link/$link.linkID">$len(comments) comments</a>
+    <hr/>

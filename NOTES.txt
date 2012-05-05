@@ -1,0 +1,12 @@
+mysql
+-----
+
+mysqladmin -u root -p create niche
+
+mysql -u root -p niche
+
+CREATE USER 'niche'@'localhost' IDENTIFIED BY 'whatever';
+GRANT ALL PRIVILEGES ON niche.* TO 'niche'@'localhost';
+
+mysql -u niche -p < niche.sql
+

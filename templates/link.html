@@ -1,0 +1,36 @@
+$def with (link)
+
+$ here = "/link/%s" % link.linkID
+
+<h1>$model.to_date(link.timestamp)</h1>
+
+<ul>
+  <li>Hidden: <a href="$here/hide">${ 'Yip' if link.hidden else 'Nope' }</a>
+  <li>Closed: <a href="$here/close">${ 'Yip' if link.closed else 'Nope' }</a>
+</ul>
+
+$if not link.URL:
+    <b>$link.title</b>
+$else:
+    <a href="$link.URL">$link.URL_description</a>
+$:link.description
+$if link.extended:
+    <p>$:link.extended
+<p>
+$ user = model.get_user(link.userID)
+posted by <a href="/user/$user.username">$user.username</a>
+
+$ comments = model.get_comments(link.linkID)
+
+$for comment in comments:
+    <p>
+    $:comment.content
+    <p>
+    $ user = model.get_user(comment.userID)
+    posted by <a href="/user/$user.username">$user.username</a>
+    $ likes = model.get_likes(comment.commentID)
+    | $len(likes) likes
+    | <a href="/comment/$comment.commentID/like">I like it</a>
+    $if model.is_admin():
+        | <a href="/comment/$comment.commentID/delete">Delete</a>
+    <hr/>
