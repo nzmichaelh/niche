@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import ConfigParser
 
 import web
 
@@ -15,7 +16,36 @@ urls = (
     '/newuser', 'newuser',
 )
 
-db = web.database(dbn='mysql', user='niche', pw='whatever', db='niche')
+DEFAULTS = [
+    ( 'general', {
+            'dateformat': '%B %d, %Y',
+            }),
+    ( 'db', {
+            'db': 'niche',
+            'user': 'niche',
+            'password': 'whatever',
+            }),
+    ]
+
+def read_config():
+    cfg = ConfigParser.RawConfigParser()
+
+    for section, items in DEFAULTS:
+        cfg.add_section(section)
+
+        for name, value in items.items():
+            cfg.set(section, name, value)
+
+    cfg.read('niche.ini')
+    return cfg
+
+config = read_config()
+
+db = web.database(dbn='mysql',
+                  user=config.get('db', 'user'),
+                  pw=config.get('db', 'password'),
+                  db=config.get('db','db')
+                  )
 
 def first_or_none(table, column, id):
     vs = db.select(table, where='%s = $id' % column, vars={'id': id}, limit=1)
@@ -31,15 +61,12 @@ def check_found(v):
     else:
         return web.notfound()
 
-class config:
-    DATE_FORMAT = '%B %d, %Y'
-
 class model:
     def is_admin(self):
         return True
 
     def to_datestr(self, timestamp):
-        return '%s' % self.to_date(timestamp).strftime(config.DATE_FORMAT)
+        return self.to_date(timestamp).strftime(config.get('general', 'dateformat'))
 
     def to_date(self, timestamp):
         return datetime.date.fromtimestamp(timestamp)
