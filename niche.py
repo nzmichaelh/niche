@@ -19,6 +19,7 @@ urls = (
 DEFAULTS = [
     ( 'general', {
             'dateformat': '%B %d, %Y',
+            'base': '/',
             }),
     ( 'db', {
             'db': 'niche',
@@ -98,7 +99,7 @@ class model:
 
 render = web.template.render('templates/',
                              base='layout',
-                             globals={ 'model': model() }
+                             globals={ 'model': model(), 'config': config }
                              )
 
 app = web.application(urls, globals())

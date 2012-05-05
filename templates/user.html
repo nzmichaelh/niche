@@ -11,6 +11,6 @@ Name: $user.realname
 $:user.bio
 
 <p>
-  <a href="/user/$user.username/links">$len(model.get_links(user.userID, 'userID')) links</a>
-| <a href="/user/$user.username/comments">$len(model.get_comments(user.userID, 'userID')) comments</a>
-| <a href="/user/$user.username/likes">$len(model.get_likes(user.userID, 'userID')) likes</a>
+  <a href="user/$user.username/links">$len(model.get_links(user.userID, 'userID')) links</a>
+| <a href="user/$user.username/comments">$len(model.get_comments(user.userID, 'userID')) comments</a>
+| <a href="user/$user.username/likes">$len(model.get_likes(user.userID, 'userID')) likes</a>
