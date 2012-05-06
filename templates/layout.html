@@ -1,29 +1,37 @@
 $def with (content)
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+$ active = model.get_active()
+
+<!DOCTYPE html>
+<html>
   <head>
+    <title>MonkeyFilter</title>
+    <link rel="stylesheet" type="text/css" href="/static/style.css">
     $ base = config.get('general', 'base')
     $if base:
         <base href="$base"/>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title>MonkeyFilter</title>
   </head>
   <body>
-
-    <div id="header">
-      <h1><a href="">Monkeyfilter</a></h1>
-    </div>
-    
+    <h1><a href="">Monkeyfilter</a></h1>
     <div id="navigation">
       <ul>
-	<li><a href="login">Login</a>
+	$if active:
+	    <li><a href="user/$active.username">$active.username</a>
+	    <li><a href="logout">Logout</a>
+	$else:
+	    <li><a href="login">Login</a>
+        <li><a href="link/new">New post</a>
       </ul>
     </div>
     <div class="spacer">
     </div>
     <div id="content">
-      $:content
+      $ message = model.get_message()
+      $if message:
+          <p class="message">$message</p>
+      <div id="body">
+	$:content
+      </div>
     </div>
   </body>
 </html>

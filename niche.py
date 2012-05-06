@@ -1,18 +1,27 @@
 import datetime
 import hashlib
 import ConfigParser
+import passlib
+import re
+import time
+
+from passlib.apps import custom_app_context as pwd_context
 
 import web
+#web.config.debug = False
 
 urls = (
     '/?', 'index',
+    '/link/new', 'new_link',
     '/link/(\d+)', 'link',
     '/link/(\d+)/hide', 'hide_link',
     '/link/(\d+)/close', 'close_link',
     '/comment/(\d+)/delete', 'delete_comment',
     '/comment/(\d+)/like', 'like_comment',
     '/user/([^/]+)', 'user',
+    '/user/([^/]+)/password', 'password',
     '/login', 'login',
+    '/logout', 'logout',
     '/newuser', 'newuser',
 )
 
@@ -62,7 +71,7 @@ def check_found(v):
     else:
         return web.notfound()
 
-class model:
+class Model:
     def is_admin(self):
         return True
 
@@ -97,12 +106,48 @@ class model:
     def get_gravatar(self, email):
         return hashlib.md5(email.strip().lower()).hexdigest()
 
+    def get_message(self):
+        message = session.get('message', None)
+
+        if message:
+            session.message = None
+
+        print 'Message %s' % message
+        return message
+
+    def inform(self, message):
+        session.message = message
+        print 'Set to %s' % message
+
+    def get_active(self):
+        id = session.get('userID', None)
+
+        if not id:
+            return None
+
+        return first_or_none('1_users', 'userID', id)
+
+model = Model()
+
 render = web.template.render('templates/',
                              base='layout',
-                             globals={ 'model': model(), 'config': config }
+                             globals={ 'model': model, 'config': config },
                              )
 
-app = web.application(urls, globals())
+app = web.application(urls, locals())
+
+def make_session():
+    if web.config.get('_session') is None:
+        session = web.session.Session(app, web.session.DiskStore('sessions'),
+                                      initializer={'message': None}
+                                      )
+        web.config._session = session
+    else:
+        session = web.config._session
+
+    return session
+
+session = make_session()
 
 class index:
     def GET(self):
@@ -111,33 +156,91 @@ class index:
 
 class link:
     def GET(self, id):
-        link = check_found(model().get_link(id))
+        link = check_found(model.get_link(id))
         return render.link(link)
+
+def url_validator(v):
+    if not v:
+        return True
+
+    return re.match('(http|https|ftp|mailto)://.+', v)
+
+def authenticate(msg='Login required'):
+    if not session.get('userID', None):
+        model.inform(msg)
+        raise web.seeother('/login')            
+
+class new_link:
+    form = web.form.Form(
+        web.form.Textbox('title', web.form.notnull),
+        web.form.Textbox('url', web.form.Validator("Doesn't look like a URL", url_validator)),
+        web.form.Textbox('url_description'),
+        web.form.Textarea('description'),
+        web.form.Textarea('extended'),
+        validators = [
+            web.form.Validator('URLs need a description', lambda x: x.url_description if x.url else True),
+            web.form.Validator('Need either a URL or a description', lambda x: x.url or x.description),
+            ]
+        )
+
+    def authenticate(self):
+        authenticate('Please login or create an account to post')
+
+    def GET(self):
+        self.authenticate()
+        return render.new_link(self.form())
+
+    def POST(self):
+        self.authenticate()
+
+        form = self.form()
+
+        if not form.validates():
+            return render.login(form)
+
+        user = model.get_active()
+        next = db.insert('1_links',
+                         userID=user.userID,
+                         timestamp=time.time(),
+                         title=form.d.title,
+                         URL=form.d.url,
+                         URL_description=form.d.url_description,
+                         description=form.d.description,
+                         extended=form.d.extended
+                         )
+
+        model.inform("Here's your new post!")
+        return web.seeother('/link/%d' % next)
 
 class hide_link:
     def GET(self, id):
-        link = check_found(model().get_link(id))
-        db.update('1_links', where='linkID = $id', hidden=not link.hidden, vars={'id': id})
+        link = check_found(model.get_link(id))
+        next = not link.hidden
+        db.update('1_links', where='linkID = $id', hidden=next, vars={'id': id})
 
+        model.inform('Link is hidden' if next else 'Link now shows')
         raise web.seeother('/link/%s' % id)
 
 class close_link:
     def GET(self, id):
-        link = check_found(model().get_link(id))
-        db.update('1_links', where='linkID = $id', closed=not link.closed, vars={'id': id})
+        link = check_found(model.get_link(id))
+        next = not link.closed
+        db.update('1_links', where='linkID = $id', closed=next, vars={'id': id})
 
+        model.inform('Link is closed' if next else 'Link is open')
         raise web.seeother('/link/%s' % id)
 
 class delete_comment:
     def GET(self, id):
-        comment = check_found(model().get_comment(id))
+        comment = check_found(model.get_comment(id))
         db.delete('1_comments', where='commentID = $id', vars={'id': id})
 
+        model.inform('Deleted comment')
         raise web.seeother('/link/%s' % comment.linkID)
 
 class like_comment:
     def GET(self, id):
-        comment = check_found(model().get_comment(id))
+        comment = check_found(model.get_comment(id))
 
         db.insert('1_likes', commentID=comment.commentID, userID=1)
         raise web.seeother('/link/%s' % comment.linkID)
@@ -148,8 +251,73 @@ class user:
         return render.user(user)
 
 class login:
+    login = web.form.Form(
+        web.form.Textbox('username', web.form.notnull),
+        web.form.Password('password', web.form.notnull),
+        )
+
     def GET(self):
-        return render.login()
+        return render.login(self.login())
+
+    def POST(self):
+        form = self.login()
+
+        if not form.validates():
+            return render.login(form)
+
+        user = first_or_none('1_users', 'username', form.d.username)
+
+        if not user:
+            form.valid = False
+            return render.login(form)
+
+        ok = False
+
+        try:
+            ok = passlib.hash.mysql323.verify(form.d.password, user.password)
+        except ValueError:
+            ok = pwd_context.verify(form.d.password, user.password)
+
+        if not ok:
+            form.valid = False
+            return render.login(form)
+
+        session.userID = user.userID
+
+        model.inform('Logged in')
+        raise web.seeother('/')
+
+class logout:
+    def GET(self):
+        session.userID = None
+
+        model.inform('Logged out')
+        raise web.seeother('/')
+
+password_validator = web.form.Validator('Password is a bit short', lambda x: len(x) >= 3)
+
+class password:
+    form = web.form.Form(
+        web.form.Password('password', web.form.notnull, password_validator, description='New password'),
+        web.form.Password('again', web.form.notnull, description='And again'),
+        validators=[
+            web.form.Validator("Passwords didn't match", lambda x: x.password == x.again)
+            ]
+        )
+
+    def GET(self, id):
+        return render.password(self.form())
+
+    def POST(self, id):
+        form = self.form()
+
+        if not form.validates():
+            return render.login(form)
+
+        db.update('1_users', password=pwd_context.encrypt(form.d.password), where='username=$id', vars={'id': id})
+        
+        model.inform('Password changed')
+        raise web.seeother('/user/%s' % id)
 
 if __name__ == "__main__":
     app.run()

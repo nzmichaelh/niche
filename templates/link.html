@@ -2,7 +2,7 @@ $def with (link)
 
 $ here = "link/%s" % link.linkID
 
-<h1>$model.to_date(link.timestamp)</h1>
+<h2>$model.to_datestr(link.timestamp)</h2>
 
 <ul>
   <li>Hidden: <a href="$here/hide">${ 'Yip' if link.hidden else 'Nope' }</a>
