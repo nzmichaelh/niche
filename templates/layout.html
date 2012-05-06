@@ -5,14 +5,14 @@ $ active = model.get_active()
 <!DOCTYPE html>
 <html>
   <head>
-    <title>MonkeyFilter</title>
+    <title>$config.get('site', 'name')</title>
     <link rel="stylesheet" type="text/css" href="/static/style.css">
     $ base = config.get('general', 'base')
     $if base:
         <base href="$base"/>
   </head>
   <body>
-    <h1><a href="">Monkeyfilter</a></h1>
+    <h1><a href="">$config.get('site', 'name')</a></h1>
     <div id="navigation">
       <ul>
 	$if active:

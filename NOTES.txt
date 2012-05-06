@@ -10,3 +10,6 @@ GRANT ALL PRIVILEGES ON niche.* TO 'niche'@'localhost';
 
 mysql -u niche -p < niche.sql
 
+Sanitizing
+----------
+bleach looks fine https://github.com/jsocol/bleach

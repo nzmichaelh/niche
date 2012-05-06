@@ -5,10 +5,9 @@ import passlib
 import re
 import time
 
-from passlib.apps import custom_app_context as pwd_context
-
 import web
-#web.config.debug = False
+import bleach
+from passlib.apps import custom_app_context as pwd_context
 
 import strings
 
@@ -43,6 +42,9 @@ DEFAULTS = [
             'db': 'niche',
             'user': 'niche',
             'password': 'whatever',
+            }),
+    ( 'site', {
+            'name': 'Nichefilter'
             }),
     ]
 
@@ -211,13 +213,15 @@ class new_link:
             return render.login(form)
 
         user = model.get_active()
+        description = bleach.clean(form.d.description)
+
         next = db.insert('1_links',
                          userID=user.userID,
                          timestamp=time.time(),
                          title=form.d.title,
                          URL=form.d.url,
                          URL_description=form.d.url_description,
-                         description=form.d.description,
+                         description=description,
                          extended=form.d.extended
                          )
 
@@ -268,11 +272,13 @@ class new_comment:
             return render.new_comment(link, form)
 
         user = model.get_active()
+        content = bleach.clean(form.d.content)
+
         next = db.insert('1_comments',
                          linkID=link.linkID,
                          userID=user.userID,
                          timestamp=time.time(),
-                         content=form.d.content
+                         content=content
                          )
 
         model.inform(_("New comment success"))
