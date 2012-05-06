@@ -2,7 +2,10 @@ $def with (link)
 
 $ here = "link/%s" % link.linkID
 
-<h2>$model.to_datestr(link.timestamp)</h2>
+$ date = model.to_datestr(link.timestamp)
+<h2>
+  <a href="/daily/$model.to_date_link(link.timestamp)">$date</a>
+</h2>
 
 <ul>
   <li>Hidden: <a href="$here/hide">${ 'Yip' if link.hidden else 'Nope' }</a>
@@ -12,13 +15,14 @@ $ here = "link/%s" % link.linkID
 $if not link.URL:
     <b>$link.title</b>
 $else:
-    <a href="$link.URL">$link.URL_description</a>
+    <a href="$link.URL">$:link.URL_description</a>
 $:link.description
 $if link.extended:
     <p>$:link.extended
 <p>
 $ user = model.get_user(link.userID)
 posted by <a href="user/$user.username">$user.username</a>
+$model.ago(link.timestamp) ago
 
 $ comments = model.get_comments(link.linkID)
 
@@ -28,6 +32,7 @@ $for comment in comments:
     <p>
     $ user = model.get_user(comment.userID)
     posted by <a href="user/$user.username">$user.username</a>
+    $model.ago(comment.timestamp) ago
     $ likes = model.get_likes(comment.commentID)
     | $len(likes) likes
     | <a href="comment/$comment.commentID/like">I like it</a>

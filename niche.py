@@ -87,44 +87,94 @@ def first_or_none(table, column, id, strict=False):
         return None
 
 def first(table, column, id):
+    """Get the first matching item in the table or raise not found."""
     return first_or_none(table, column, id, strict=True)
 
 class Model:
+    """Top level helpers.  Exposed to scripts."""
     def is_admin(self):
         return True
 
+    def ago(self, timestamp):
+        """Turn a timestamp into a string saying how long ago the
+        timestamp was.
+        """
+        elapsed = now() - timestamp
+        elapsed = max(1, elapsed)
+
+        seconds = elapsed
+        minutes = seconds / 60
+        hours = minutes / 60
+        days = hours / 24
+        weeks = days / 7
+        months = days / 30.5
+        years = days / 365
+
+        if seconds < 60:
+            v, suffix = seconds, 'second'
+        elif minutes <= 60:
+            v, suffix = minutes, 'minute'
+        elif hours <= 48:
+            v, suffix = hours, 'hour'
+        elif days <= 14:
+            v, suffix = days, 'day'
+        elif weeks < 12:
+            v, suffix = weeks, 'week'
+        elif months < 24:
+            v, suffix = months, 'month'
+        else:
+            v, suffix = years, 'years'
+
+        v = int(v)
+
+        if v != 1:
+            return '%s %ss' % (v, suffix)
+        else:
+            return '%s %s' % (v, suffix)
+
     def to_datestr(self, timestamp):
+        """Convert a timestamp to a date string."""
         return self.to_date(timestamp).strftime(config.get('general', 'dateformat'))
 
     def to_date(self, timestamp):
+        """Convert a timestamp to a date object."""
         return datetime.date.fromtimestamp(timestamp)
 
     def to_date_link(self, timestamp):
+        """Convert a timestamp to a link."""
         date = self.to_date(timestamp)
         return '%02d/%02d/%04d' % (date.day, date.month, date.year)
 
     def get_link(self, id):
+        """Get a link by link ID"""
         return first_or_none('1_links', 'linkID', id, strict=True)
 
     def get_comment(self, id):
+        """Get a comment by comment ID"""
         return first_or_none('1_comments', 'commentID', id, strict=True)
 
     def get_user(self, id):
+        """Get a user by user ID"""
         return first_or_none('1_users', 'userID', id)
 
     def get_comments(self, id, key='linkID'):
+        """Get all comments for a link or other"""
         return db.select('1_comments', where='%s = $id' % key, vars={'id': id})
 
     def get_likes(self, id, key='commentID'):
+        """Get all likes for a comment or other"""
         return db.select('1_likes', where='%s = $id' % key, vars={'id': id})
 
     def get_links(self, id, key='userID'):
+        """Get all links for a user or other"""
         return db.select('1_links', where='%s = $id' % key, vars={'id': id})
 
     def get_gravatar(self, email):
+        """Get the gravatar hash for an email"""
         return hashlib.md5(email.strip().lower()).hexdigest()
 
     def get_message(self):
+        """Get the message for the user, if any, and clear"""
         message = session.get('message', None)
 
         if message:
@@ -133,9 +183,13 @@ class Model:
         return message
 
     def inform(self, message):
+        """Log a message to show the user on the next page"""
         session.message = message
 
     def get_active(self):
+        """Get the user entry for the currently logged in user, or
+        None.
+        """
         id = session.get('userID', None)
 
         if not id:
@@ -153,6 +207,7 @@ render = web.template.render('templates/',
 app = web.application(urls, locals())
 
 def make_session():
+    """Helper that makes the session object, even if in debug mode."""
     if web.config.get('_session') is None:
         session = web.session.Session(app, web.session.DiskStore('sessions'),
                                       initializer={'message': None}
@@ -166,8 +221,10 @@ def make_session():
 session = make_session()
 
 def now():
+    """Return the current time in the right epoch."""
     return time.time()
 
+# Validate a password.  Pretty lax.
 password_validator = web.form.Validator(_("Short password"), lambda x: len(x) >= 3)
 
 def url_validator(v):
@@ -182,6 +239,7 @@ def authenticate(msg=_("Login required")):
         raise web.seeother('/login')            
 
 def error(message, condition, target='/'):
+    """Log an error if condition is true and bounce to somewhere."""
     if condition:
         model.inform(message)
         raise web.seeother(target)
