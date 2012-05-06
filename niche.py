@@ -27,12 +27,7 @@ urls = (
     '/newuser', 'newuser',
 )
 
-def get_string(id):
-    id = id.lower().replace(' ', '_').replace("'", "")
-    return strings.__dict__[id]
-
-_ = get_string
-
+# Default configuration
 DEFAULTS = [
     ( 'general', {
             'dateformat': '%B %d, %Y',
@@ -49,6 +44,7 @@ DEFAULTS = [
     ]
 
 def read_config():
+    """Set up the defaults and read in niche.ini, if any."""
     cfg = ConfigParser.RawConfigParser()
 
     for section, items in DEFAULTS:
@@ -62,25 +58,36 @@ def read_config():
 
 config = read_config()
 
+def get_string(id):
+    """Get a string gettext style.  Splits the strings from the
+    code.
+    """
+    id = id.lower().replace(' ', '_').replace("'", "")
+    return strings.__dict__[id]
+
+_ = get_string
+
 db = web.database(dbn='mysql',
                   user=config.get('db', 'user'),
                   pw=config.get('db', 'password'),
                   db=config.get('db','db')
                   )
 
-def first_or_none(table, column, id):
+def first_or_none(table, column, id, strict=False):
+    """Get the first item in the table that matches or None if there's
+    no match.
+    """
     vs = db.select(table, where='%s = $id' % column, vars={'id': id}, limit=1)
 
     if len(vs):
         return vs[0]
+    elif strict:
+        raise web.notfound()
     else:
         return None
 
-def check_found(v):
-    if v:
-        return v
-    else:
-        return web.notfound()
+def first(table, column, id):
+    return first_or_none(table, column, id, strict=True)
 
 class Model:
     def is_admin(self):
@@ -97,10 +104,10 @@ class Model:
         return '%02d/%02d/%04d' % (date.day, date.month, date.year)
 
     def get_link(self, id):
-        return first_or_none('1_links', 'linkID', id)
+        return first_or_none('1_links', 'linkID', id, strict=True)
 
     def get_comment(self, id):
-        return first_or_none('1_comments', 'commentID', id)
+        return first_or_none('1_comments', 'commentID', id, strict=True)
 
     def get_user(self, id):
         return first_or_none('1_users', 'userID', id)
@@ -158,15 +165,10 @@ def make_session():
 
 session = make_session()
 
-class index:
-    def GET(self):
-        links = db.select('1_links', limit=50, order="timestamp DESC")
-        return render.index(links)
+def now():
+    return time.time()
 
-class link:
-    def GET(self, id):
-        link = check_found(model.get_link(id))
-        return render.link(link)
+password_validator = web.form.Validator(_("Short password"), lambda x: len(x) >= 3)
 
 def url_validator(v):
     if not v:
@@ -179,10 +181,20 @@ def authenticate(msg=_("Login required")):
         model.inform(msg)
         raise web.seeother('/login')            
 
-def error(message, condition):
-    if not condition:
+def error(message, condition, target='/'):
+    if condition:
         model.inform(message)
-        raise web.seeother('/')
+        raise web.seeother(target)
+
+class index:
+    def GET(self):
+        links = db.select('1_links', limit=50, order="timestamp DESC")
+        return render.index(links)
+
+class link:
+    def GET(self, id):
+        link = model.get_link(id)
+        return render.link(link)
 
 class new_link:
     form = web.form.Form(
@@ -213,16 +225,18 @@ class new_link:
             return render.login(form)
 
         user = model.get_active()
+        url_description = bleach.clean(form.d.url_description)
         description = bleach.clean(form.d.description)
+        extended = bleach.clean(form.d.extended)
 
         next = db.insert('1_links',
                          userID=user.userID,
-                         timestamp=time.time(),
+                         timestamp=now(),
                          title=form.d.title,
                          URL=form.d.url,
-                         URL_description=form.d.url_description,
+                         URL_description=url_description,
                          description=description,
-                         extended=form.d.extended
+                         extended=extended
                          )
 
         model.inform(_("New post success"))
@@ -230,7 +244,7 @@ class new_link:
 
 class hide_link:
     def GET(self, id):
-        link = check_found(model.get_link(id))
+        link = model.get_link(id)
         next = not link.hidden
         db.update('1_links', where='linkID = $id', hidden=next, vars={'id': id})
 
@@ -239,7 +253,7 @@ class hide_link:
 
 class close_link:
     def GET(self, id):
-        link = check_found(model.get_link(id))
+        link = model.get_link(id)
         next = not link.closed
         db.update('1_links', where='linkID = $id', closed=next, vars={'id': id})
 
@@ -254,9 +268,8 @@ class new_comment:
     def check(self, id):
         authenticate(_("Login to comment"))
         link = model.get_link(id)
-        
-        error(_("No such link"), link != None)
-        error(_("Link is closed"), not link.closed)
+
+        error(_("Link is closed"), link.closed)
 
         return link
 
@@ -277,7 +290,7 @@ class new_comment:
         next = db.insert('1_comments',
                          linkID=link.linkID,
                          userID=user.userID,
-                         timestamp=time.time(),
+                         timestamp=now(),
                          content=content
                          )
 
@@ -286,7 +299,7 @@ class new_comment:
 
 class delete_comment:
     def GET(self, id):
-        comment = check_found(model.get_comment(id))
+        comment = model.get_comment(id)
         db.delete('1_comments', where='commentID = $id', vars={'id': id})
 
         model.inform(_("Comment deleted"))
@@ -294,14 +307,18 @@ class delete_comment:
 
 class like_comment:
     def GET(self, id):
-        comment = check_found(model.get_comment(id))
+        authenticate(_("Login to like"))
+        comment = model.get_comment(id)
 
-        db.insert('1_likes', commentID=comment.commentID, userID=1)
+        userID = session.userID
+        db.insert('1_likes', commentID=comment.commentID, userID=userID)
+
+        model.inform(_("Liked"))
         raise web.seeother('/link/%s' % comment.linkID)
 
 class user:
     def GET(self, id):
-        user = first_or_none('1_users', 'username', id)
+        user = first('1_users', 'username', id)
         return render.user(user)
 
 class login:
@@ -348,21 +365,29 @@ class logout:
         model.inform(_("Logged out"))
         raise web.seeother('/')
 
-password_validator = web.form.Validator(_("Short password"), lambda x: len(x) >= 3)
-
 class password:
     form = web.form.Form(
-        web.form.Password('password', web.form.notnull, password_validator, description=_("New password")),
+        web.form.Password('password', web.form.notnull, password_validator,
+                          description=_("New password")),
         web.form.Password('again', web.form.notnull, description=_("Password again")),
         validators=[
             web.form.Validator(_("Passwords don't match"), lambda x: x.password == x.again)
             ]
         )
 
+    def authenticate(self, id):
+        authenticate()
+
+        active = model.get_active()
+        error(_("Permission denied"), active.username != id, '/user/%s' % id)
+
     def GET(self, id):
+        self.authenticate(id)
         return render.password(self.form())
 
     def POST(self, id):
+        self.authenticate(id)
+
         form = self.form()
 
         if not form.validates():
