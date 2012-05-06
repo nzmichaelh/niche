@@ -10,6 +10,8 @@ from passlib.apps import custom_app_context as pwd_context
 import web
 #web.config.debug = False
 
+import strings
+
 urls = (
     '/?', 'index',
     '/link/new', 'new_link',
@@ -25,6 +27,12 @@ urls = (
     '/logout', 'logout',
     '/newuser', 'newuser',
 )
+
+def get_string(id):
+    id = id.lower().replace(' ', '_').replace("'", "")
+    return strings.__dict__[id]
+
+_ = get_string
 
 DEFAULTS = [
     ( 'general', {
@@ -113,12 +121,10 @@ class Model:
         if message:
             session.message = None
 
-        print 'Message %s' % message
         return message
 
     def inform(self, message):
         session.message = message
-        print 'Set to %s' % message
 
     def get_active(self):
         id = session.get('userID', None)
@@ -166,7 +172,7 @@ def url_validator(v):
 
     return re.match('(http|https|ftp|mailto)://.+', v)
 
-def authenticate(msg='Login required'):
+def authenticate(msg=_("Login required")):
     if not session.get('userID', None):
         model.inform(msg)
         raise web.seeother('/login')            
@@ -179,18 +185,18 @@ def error(message, condition):
 class new_link:
     form = web.form.Form(
         web.form.Textbox('title', web.form.notnull),
-        web.form.Textbox('url', web.form.Validator("Doesn't look like a URL", url_validator)),
+        web.form.Textbox('url', web.form.Validator(_("Not a URL"), url_validator)),
         web.form.Textbox('url_description'),
         web.form.Textarea('description'),
         web.form.Textarea('extended'),
         validators = [
-            web.form.Validator('URLs need a description', lambda x: x.url_description if x.url else True),
-            web.form.Validator('Need either a URL or a description', lambda x: x.url or x.description),
+            web.form.Validator(_("URLs need a description"), lambda x: x.url_description if x.url else True),
+            web.form.Validator(_("Need a URL or description"), lambda x: x.url or x.description),
             ]
         )
 
     def authenticate(self):
-        authenticate('Please login or create an account to post')
+        authenticate(_("Login to post"))
 
     def GET(self):
         self.authenticate()
@@ -215,7 +221,7 @@ class new_link:
                          extended=form.d.extended
                          )
 
-        model.inform("Here's your new post!")
+        model.inform(_("New post success"))
         return web.seeother('/link/%d' % next)
 
 class hide_link:
@@ -224,7 +230,7 @@ class hide_link:
         next = not link.hidden
         db.update('1_links', where='linkID = $id', hidden=next, vars={'id': id})
 
-        model.inform('Link is hidden' if next else 'Link now shows')
+        model.inform(_("Link is hidden") if next else _("Link now shows"))
         raise web.seeother('/link/%s' % id)
 
 class close_link:
@@ -233,7 +239,7 @@ class close_link:
         next = not link.closed
         db.update('1_links', where='linkID = $id', closed=next, vars={'id': id})
 
-        model.inform('Link is closed' if next else 'Link is open')
+        model.inform(_("Link is closed") if next else _("Link is open"))
         raise web.seeother('/link/%s' % id)
 
 class new_comment:
@@ -242,11 +248,11 @@ class new_comment:
         )
 
     def check(self, id):
-        authenticate('Please login or create an account to comment')
+        authenticate(_("Login to comment"))
         link = model.get_link(id)
         
-        error('No such link', link != None)
-        error('Link is closed', not link.closed)
+        error(_("No such link"), link != None)
+        error(_("Link is closed"), not link.closed)
 
         return link
 
@@ -269,7 +275,7 @@ class new_comment:
                          content=form.d.content
                          )
 
-        model.inform("Here's your new comment!")
+        model.inform(_("New comment success"))
         return web.seeother('/link/%d' % link.linkID)
 
 class delete_comment:
@@ -277,7 +283,7 @@ class delete_comment:
         comment = check_found(model.get_comment(id))
         db.delete('1_comments', where='commentID = $id', vars={'id': id})
 
-        model.inform('Deleted comment')
+        model.inform(_("Comment deleted"))
         raise web.seeother('/link/%s' % comment.linkID)
 
 class like_comment:
@@ -326,24 +332,24 @@ class login:
 
         session.userID = user.userID
 
-        model.inform('Logged in')
+        model.inform(_("Logged in"))
         raise web.seeother('/')
 
 class logout:
     def GET(self):
         session.userID = None
 
-        model.inform('Logged out')
+        model.inform(_("Logged out"))
         raise web.seeother('/')
 
-password_validator = web.form.Validator('Password is a bit short', lambda x: len(x) >= 3)
+password_validator = web.form.Validator(_("Short password"), lambda x: len(x) >= 3)
 
 class password:
     form = web.form.Form(
-        web.form.Password('password', web.form.notnull, password_validator, description='New password'),
-        web.form.Password('again', web.form.notnull, description='And again'),
+        web.form.Password('password', web.form.notnull, password_validator, description=_("New password")),
+        web.form.Password('again', web.form.notnull, description=_("Password again")),
         validators=[
-            web.form.Validator("Passwords didn't match", lambda x: x.password == x.again)
+            web.form.Validator(_("Passwords don't match"), lambda x: x.password == x.again)
             ]
         )
 
@@ -358,7 +364,7 @@ class password:
 
         db.update('1_users', password=pwd_context.encrypt(form.d.password), where='username=$id', vars={'id': id})
         
-        model.inform('Password changed')
+        model.inform(_("Password changed"))
         raise web.seeother('/user/%s' % id)
 
 if __name__ == "__main__":
