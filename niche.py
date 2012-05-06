@@ -16,6 +16,7 @@ urls = (
     '/link/(\d+)', 'link',
     '/link/(\d+)/hide', 'hide_link',
     '/link/(\d+)/close', 'close_link',
+    '/link/(\d+)/new', 'new_comment',
     '/comment/(\d+)/delete', 'delete_comment',
     '/comment/(\d+)/like', 'like_comment',
     '/user/([^/]+)', 'user',
@@ -170,6 +171,11 @@ def authenticate(msg='Login required'):
         model.inform(msg)
         raise web.seeother('/login')            
 
+def error(message, condition):
+    if not condition:
+        model.inform(message)
+        raise web.seeother('/')
+
 class new_link:
     form = web.form.Form(
         web.form.Textbox('title', web.form.notnull),
@@ -229,6 +235,42 @@ class close_link:
 
         model.inform('Link is closed' if next else 'Link is open')
         raise web.seeother('/link/%s' % id)
+
+class new_comment:
+    form = web.form.Form(
+        web.form.Textarea('content', web.form.notnull)
+        )
+
+    def check(self, id):
+        authenticate('Please login or create an account to comment')
+        link = model.get_link(id)
+        
+        error('No such link', link != None)
+        error('Link is closed', not link.closed)
+
+        return link
+
+    def GET(self, id):
+        link = self.check(id)
+        return render.new_comment(link, self.form())
+
+    def POST(self, id):
+        link = self.check(id)
+        form = self.form()
+
+        if not form.validates():
+            return render.new_comment(link, form)
+
+        user = model.get_active()
+        next = db.insert('1_comments',
+                         linkID=link.linkID,
+                         userID=user.userID,
+                         timestamp=time.time(),
+                         content=form.d.content
+                         )
+
+        model.inform("Here's your new comment!")
+        return web.seeother('/link/%d' % link.linkID)
 
 class delete_comment:
     def GET(self, id):

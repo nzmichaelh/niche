@@ -34,3 +34,6 @@ $for comment in comments:
     $if model.is_admin():
         | <a href="comment/$comment.commentID/delete">Delete</a>
     <hr/>
+
+$if not link.closed:
+    <p><a href="/link/$link.linkID/new">New comment</a>
