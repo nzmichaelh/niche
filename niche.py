@@ -357,14 +357,14 @@ class new_comment:
 
     def GET(self, id):
         link = self.check(id)
-        return render.link(link, self.form())
+        return render.link(link, self.form(), None)
 
     def POST(self, id):
         link = self.check(id)
         form = self.form()
 
         if not form.validates():
-            return render.link(link, form, False)
+            return render.link(link, form, None)
 
         user = model.get_active()
         content = render_input(form.d.content)
