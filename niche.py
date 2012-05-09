@@ -244,6 +244,20 @@ def error(message, condition, target='/'):
         model.inform(message)
         raise web.seeother(target)
 
+def render_input(v):
+    """Tidy up user input and insert breaks for empty lines."""
+    v = bleach.clean(v)
+    
+    out = ''
+
+    for line in v.split('\n'):
+        if not line.strip():
+            out += '<br/>\n'
+        else:
+            out += line + '\n'
+
+    return out
+
 class index:
     def GET(self):
         links = db.select('1_links', limit=50, order="timestamp DESC")
@@ -252,15 +266,15 @@ class index:
 class link:
     def GET(self, id):
         link = model.get_link(id)
-        return render.link(link)
+        return render.link(link, None, False)
 
 class new_link:
     form = web.form.Form(
         web.form.Textbox('title', web.form.notnull),
         web.form.Textbox('url', web.form.Validator(_("Not a URL"), url_validator)),
         web.form.Textbox('url_description'),
-        web.form.Textarea('description'),
-        web.form.Textarea('extended'),
+        web.form.Textarea('description', rows=10, cols=80),
+        web.form.Textarea('extended', rows=10, cols=80),
         validators = [
             web.form.Validator(_("URLs need a description"), lambda x: x.url_description if x.url else True),
             web.form.Validator(_("Need a URL or description"), lambda x: x.url or x.description),
@@ -272,7 +286,7 @@ class new_link:
 
     def GET(self):
         self.authenticate()
-        return render.new_link(self.form())
+        return render.new_link(self.form(), None)
 
     def POST(self):
         self.authenticate()
@@ -280,12 +294,22 @@ class new_link:
         form = self.form()
 
         if not form.validates():
-            return render.login(form)
+            return render.new_link(form, None)
 
         user = model.get_active()
-        url_description = bleach.clean(form.d.url_description)
-        description = bleach.clean(form.d.description)
-        extended = bleach.clean(form.d.extended)
+        url_description = render_input(form.d.url_description)
+        description = render_input(form.d.description)
+        extended = render_input(form.d.extended)
+
+        if 'preview' in web.input():
+            preview = web.utils.Storage(
+                title=form.d.title,
+                URL=form.d.url,
+                URL_description=url_description,
+                description=description,
+                extended=extended)
+
+            return render.new_link(form, preview)
 
         next = db.insert('1_links',
                          userID=user.userID,
@@ -320,7 +344,7 @@ class close_link:
 
 class new_comment:
     form = web.form.Form(
-        web.form.Textarea('content', web.form.notnull)
+        web.form.Textarea('content', web.form.notnull, rows=10, cols=80)
         )
 
     def check(self, id):
@@ -333,17 +357,20 @@ class new_comment:
 
     def GET(self, id):
         link = self.check(id)
-        return render.new_comment(link, self.form())
+        return render.link(link, self.form())
 
     def POST(self, id):
         link = self.check(id)
         form = self.form()
 
         if not form.validates():
-            return render.new_comment(link, form)
+            return render.link(link, form, False)
 
         user = model.get_active()
-        content = bleach.clean(form.d.content)
+        content = render_input(form.d.content)
+
+        if 'preview' in web.input():
+            return render.link(link, form, content)
 
         next = db.insert('1_comments',
                          linkID=link.linkID,

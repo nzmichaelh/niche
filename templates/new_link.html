@@ -1,6 +1,20 @@
-$def with (form)
+$def with (form, preview)
+
+$if preview != None:
+    $ link = preview
+    <div class="preview">
+      $if not link.URL:
+          <b>$link.title</b>
+      $else:
+	  <a href="$link.URL">$:link.URL_description</a>
+      $:link.description
+      $if link.extended:
+          <p>$:link.extended
+    </div>
+<p>
 
 <form name="main" method="post"> 
 $:form.render()
-    <input type="submit"/>
+<input type="submit" name="post" value="Post"/>
+<input type="submit" name="preview" value="Preview"/>
 </form>
