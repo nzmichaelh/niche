@@ -10,6 +10,7 @@ import bleach
 from passlib.apps import custom_app_context as pwd_context
 
 import strings
+import utils
 
 urls = (
     '/?', 'index',
@@ -73,89 +74,81 @@ db = web.database(dbn='mysql',
                   db=config.get('db','db')
                   )
 
-def first_or_none(table, column, id, strict=False):
+class AutoMapper:
+    def __init__(self, type, around):
+        self._type = type
+        self._around = around
+
+    def __getattr__(self, name):
+        if hasattr(self._around, name):
+            return getattr(self._around, name)
+
+        key = '%sID' % name
+
+        if hasattr(self._around, key):
+            return first(name, key, getattr(self._around, key))
+
+        if name.endswith('s'):
+            singular = name[:-1]
+            table = '1_%s' % name
+            assert self._type
+            key = '%sID' % self._type
+
+            rows = db.select(table, where='%s = $id' % key, vars={'id': getattr(self, key)})
+            return [AutoMapper(singular, x) for x in rows]
+
+        raise AttributeError(name)
+
+    def ago(self):
+        return utils.ago(self.timestamp)
+
+    def to_date(self):
+        """Convert a timestamp to a date object."""
+        return datetime.date.fromtimestamp(self.timestamp)
+
+    def to_datestr(self):
+        """Convert a timestamp to a date string."""
+        return self.to_date().strftime(config.get('general', 'dateformat'))
+
+    def to_date_link(self):
+        """Convert a timestamp to a link."""
+        date = self.to_date()
+        return '%02d/%02d/%04d' % (date.day, date.month, date.year)
+
+def first_or_none(type, column, id, strict=False):
     """Get the first item in the table that matches or None if there's
     no match.
     """
+    table = '1_%ss' % type
     vs = db.select(table, where='%s = $id' % column, vars={'id': id}, limit=1)
 
     if len(vs):
-        return vs[0]
+        return AutoMapper(type, vs[0])
     elif strict:
         raise web.notfound()
     else:
         return None
 
-def first(table, column, id):
+def first(type, column, id):
     """Get the first matching item in the table or raise not found."""
-    return first_or_none(table, column, id, strict=True)
+    return first_or_none(type, column, id, strict=True)
 
 class Model:
     """Top level helpers.  Exposed to scripts."""
     def is_admin(self):
         return True
 
-    def ago(self, timestamp):
-        """Turn a timestamp into a string saying how long ago the
-        timestamp was.
-        """
-        elapsed = now() - timestamp
-        elapsed = max(1, elapsed)
-
-        seconds = elapsed
-        minutes = seconds / 60
-        hours = minutes / 60
-        days = hours / 24
-        weeks = days / 7
-        months = days / 30.5
-        years = days / 365
-
-        if seconds < 60:
-            v, suffix = seconds, 'second'
-        elif minutes <= 60:
-            v, suffix = minutes, 'minute'
-        elif hours <= 48:
-            v, suffix = hours, 'hour'
-        elif days <= 14:
-            v, suffix = days, 'day'
-        elif weeks < 12:
-            v, suffix = weeks, 'week'
-        elif months < 24:
-            v, suffix = months, 'month'
-        else:
-            v, suffix = years, 'years'
-
-        v = int(v)
-
-        if v != 1:
-            return '%s %ss' % (v, suffix)
-        else:
-            return '%s %s' % (v, suffix)
-
-    def to_datestr(self, timestamp):
-        """Convert a timestamp to a date string."""
-        return self.to_date(timestamp).strftime(config.get('general', 'dateformat'))
-
-    def to_date(self, timestamp):
-        """Convert a timestamp to a date object."""
-        return datetime.date.fromtimestamp(timestamp)
-
-    def to_date_link(self, timestamp):
-        """Convert a timestamp to a link."""
-        date = self.to_date(timestamp)
-        return '%02d/%02d/%04d' % (date.day, date.month, date.year)
-
     def get_link(self, id):
         """Get a link by link ID"""
-        return first_or_none('1_links', 'linkID', id, strict=True)
+        return first_or_none('link', 'linkID', id)
 
     def get_comment(self, id):
         """Get a comment by comment ID"""
-        return first_or_none('1_comments', 'commentID', id, strict=True)
+        return first_or_none('comment', 'commentID', id, strict=True)
 
     def get_user(self, id):
         """Get a user by user ID"""
-        return first_or_none('1_users', 'userID', id)
+        return first_or_none('user', 'userID', id)
 
     def get_comments(self, id, key='linkID'):
         """Get all comments for a link or other"""
@@ -195,7 +188,7 @@ class Model:
         if not id:
             return None
 
-        return first_or_none('1_users', 'userID', id)
+        return first_or_none('user', 'userID', id)
 
 model = Model()
 
@@ -219,10 +212,6 @@ def make_session():
     return session
 
 session = make_session()
-
-def now():
-    """Return the current time in the right epoch."""
-    return time.time()
 
 # Validate a password.  Pretty lax.
 password_validator = web.form.Validator(_("Short password"), lambda x: len(x) >= 3)
@@ -261,7 +250,7 @@ def render_input(v):
 class index:
     def GET(self):
         links = db.select('1_links', limit=50, order="timestamp DESC")
-        return render.index(links)
+        return render.index([AutoMapper('link', x) for x in links])
 
 class link:
     def GET(self, id):
@@ -403,7 +392,7 @@ class like_comment:
 
 class user:
     def GET(self, id):
-        user = first('1_users', 'username', id)
+        user = first('user', 'username', id)
         return render.user(user)
 
 class login:
@@ -421,7 +410,7 @@ class login:
         if not form.validates():
             return render.login(form)
 
-        user = first_or_none('1_users', 'username', form.d.username)
+        user = first_or_none('user', 'username', form.d.username)
 
         if not user:
             form.valid = False

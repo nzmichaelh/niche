@@ -2,9 +2,9 @@ $def with (link, form, preview)
 
 $ here = "link/%s" % link.linkID
 
-$ date = model.to_datestr(link.timestamp)
+$ date = link.to_datestr()
 <h2>
-  <a href="/daily/$model.to_date_link(link.timestamp)">$date</a>
+  <a href="/daily/$link.to_date_link()">$date</a>
 </h2>
 
 <p class="meta">
@@ -19,29 +19,31 @@ $else:
 $:link.description
 $if link.extended:
     <p>$:link.extended
-<p>
-$ user = model.get_user(link.userID)
+<p class="byline">
+$ user = link.user
 posted by <a href="user/$user.username">$user.username</a>
-$model.ago(link.timestamp) ago
+$link.ago() ago
 
-$ comments = model.get_comments(link.linkID)
+$ comments = link.comments
 
 $for comment in comments:
+    <div class="comment">
     <p>
     $:comment.content
-    <p>
-    $ user = model.get_user(comment.userID)
+    <p class="byline">
+    $ user = comment.user
     posted by <a href="user/$user.username">$user.username</a>
-    $model.ago(comment.timestamp) ago
-    $ likes = model.get_likes(comment.commentID)
+    $link.ago() ago
+    $ likes = comment.likes
     | $len(likes) likes
     | <a href="comment/$comment.commentID/like">I like it</a>
     $if model.is_admin():
         | <a href="comment/$comment.commentID/delete">Delete</a>
-    <hr/>
+    </div>
 
 $if not link.closed:
     $if form:
+        <a id="comment"></a>
         $if preview != None:
             <p class="preview">$:preview
         <p>
@@ -51,4 +53,4 @@ $if not link.closed:
 	  <input type="submit" name="preview" value="Preview"/>
 	</form>
     $else:
-        <p><a href="/link/$link.linkID/new">New comment</a>
+        <p><a href="/link/$link.linkID/new#comment">New comment</a>

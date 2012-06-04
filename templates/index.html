@@ -3,13 +3,15 @@ $def with (links)
 $ last_date = None
 
 $for link in links:
-    $ date = model.to_datestr(link.timestamp)
+    $ date = link.to_datestr()
     $if date != last_date:
         <h2>
-	  <a href="/daily/$model.to_date_link(link.timestamp)">$date</a>
+	  <a href="/daily/$link.to_date_link()">$date</a>
 	</h2>
 	$ last_date = date
 
+    <div class="link">
+    <p>
     $if not link.URL:
         <b>$link.title</b>
     $else:
@@ -17,11 +19,9 @@ $for link in links:
     $:link.description
     $if link.extended:
         [<a href="/link/$link.linkID">more inside</a>]
-    <p>
-    $ user = model.get_user(link.userID)
-    posted by <a href="/user/$user.username">$user.username</a>
-    $model.ago(link.timestamp) ago
+    <p class="byline">
+    posted by <a href="/user/$link.user.username">$link.user.username</a>
+    $link.ago() ago
     -
-    $ comments = model.get_comments(link.linkID)
-    <a href="/link/$link.linkID">$len(comments) comments</a>
-    <hr/>
+    <a href="/link/$link.linkID">$len(link.comments) comments</a>
+    </div>

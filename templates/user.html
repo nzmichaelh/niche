@@ -6,13 +6,13 @@ $def with (user)
 <img src="http://www.gravatar.com/avatar/$model.get_gravatar(user.email)"/>
 Name: $user.realname
 <p>User ID: $user.userID
-$if user.userID == model.get_active().userID:
+$if model.get_active() and user.userID == model.get_active().userID:
     <a href="user/$user.username/password">Set password</a>
 <p>Homepage: <a href="$user.homepage">$user.homepage</a>
 <p>Bio:
 $:user.bio
 
 <p>
-  <a href="user/$user.username/links">$len(model.get_links(user.userID, 'userID')) links</a>
-| <a href="user/$user.username/comments">$len(model.get_comments(user.userID, 'userID')) comments</a>
-| <a href="user/$user.username/likes">$len(model.get_likes(user.userID, 'userID')) likes</a>
+  <a href="user/$user.username/links">$len(user.links) links</a>
+| <a href="user/$user.username/comments">$len(user.comments) comments</a>
+| <a href="user/$user.username/likes">$len(user.likes) likes</a>
