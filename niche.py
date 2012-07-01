@@ -150,18 +150,6 @@ class Model:
         """Get a user by user ID"""
         return first_or_none('user', 'userID', id)
 
-    def get_comments(self, id, key='linkID'):
-        """Get all comments for a link or other"""
-        return db.select('1_comments', where='%s = $id' % key, vars={'id': id})
-
-    def get_likes(self, id, key='commentID'):
-        """Get all likes for a comment or other"""
-        return db.select('1_likes', where='%s = $id' % key, vars={'id': id})
-
-    def get_links(self, id, key='userID'):
-        """Get all links for a user or other"""
-        return db.select('1_links', where='%s = $id' % key, vars={'id': id})
-
     def get_gravatar(self, email):
         """Get the gravatar hash for an email"""
         return hashlib.md5(email.strip().lower()).hexdigest()
