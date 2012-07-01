@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import datetime
 import hashlib
 import ConfigParser
@@ -461,4 +463,9 @@ class password:
         raise web.seeother('/user/%s' % id)
 
 if __name__ == "__main__":
-    app.run()
+    if config.getboolean('general', 'wsgi'):
+        web.config.debug = False
+        web.wsgi.runwsgi = lambda func, addr=None: web.wsgi.runfcgi(func, addr)
+    else:
+        # Development machine.  Run stand alone
+        pass
