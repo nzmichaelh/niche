@@ -219,7 +219,7 @@ def url_validator(v):
 
 def redirect(url):
     """Bounce to a different site absolute URL."""
-    raise web.seeother(url, absolute=True)
+    raise web.seeother(url)
 
 def authenticate(msg=_("Login required")):
     if not session.get('userID', None):
@@ -310,7 +310,7 @@ class new_link:
                          )
 
         model.inform(_("New post success"))
-        return web.redirect('/link/%d' % next)
+        redirect('/link/%d' % next)
 
 class hide_link:
     def GET(self, id):
@@ -368,7 +368,7 @@ class new_comment:
                          )
 
         model.inform(_("New comment success"))
-        return web.redirect('/link/%d' % link.linkID)
+        redirect('/link/%d' % link.linkID)
 
 class delete_comment:
     def GET(self, id):
