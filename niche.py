@@ -16,6 +16,7 @@ import utils
 
 urls = (
     '/?', 'index',
+    '/links(/\d+)?(/\d+)?(/\d+)?', 'links',
     '/link/new', 'new_link',
     '/link/(\d+)', 'link',
     '/link/(\d+)/hide', 'hide_link',
@@ -24,6 +25,7 @@ urls = (
     '/comment/(\d+)/delete', 'delete_comment',
     '/comment/(\d+)/like', 'like_comment',
     '/user/([^/]+)', 'user',
+    '/user/([^/]+)/links', 'user_links',
     '/user/([^/]+)/password', 'password',
     '/login', 'login',
     '/logout', 'logout',
@@ -36,6 +38,7 @@ DEFAULTS = [
             'dateformat': '%B %d, %Y',
             'base': '/',
             'wsgi': 'false',
+            'limit': 50,
             }),
     ( 'db', {
             'db': 'niche',
@@ -81,6 +84,10 @@ db = web.database(dbn='mysql',
 def now():
     return time.time()
 
+fallbacks = {
+    'user': web.utils.Storage(username='anonymous'),
+}
+
 class AutoMapper:
     def __init__(self, type, around):
         self._type = type
@@ -93,7 +100,16 @@ class AutoMapper:
         key = '%sID' % name
 
         if hasattr(self._around, key):
-            return first(name, key, getattr(self._around, key))
+            id = getattr(self._around, key)
+            got = first_or_none(name, key, id)
+
+            if got:
+                return got
+
+            if name in fallbacks:
+                return fallbacks[name]
+
+            raise web.notfound()
 
         if name.endswith('s'):
             singular = name[:-1]
@@ -120,7 +136,7 @@ class AutoMapper:
     def to_date_link(self):
         """Convert a timestamp to a link."""
         date = self.to_date()
-        return '%02d/%02d/%04d' % (date.day, date.month, date.year)
+        return '%04d/%02d/%02d' % (date.year, date.month, date.day)
 
 def first_or_none(type, column, id, strict=False):
     """Get the first item in the table that matches or None if there's
@@ -252,10 +268,69 @@ def render_input(v):
 
     return out
 
+def render_links(where=None, span=None, vars={}):
+    input = web.input()
+    offset = int(input.get('offset', 0))
+    offset = max(offset, 0)
+
+    limit = int(input.get('limit', config.get('general', 'limit')))
+    limit = max(0, min(200, limit))
+
+    links = db.select('1_links', where=where, vars=vars, limit=limit, offset=offset, order="timestamp DESC")
+
+    if where:
+        results = db.query("SELECT COUNT(*) AS total FROM 1_links WHERE %s" % where, vars=vars)
+    else:
+        results = db.query("SELECT COUNT(*) AS total FROM 1_links")
+
+    total = results[0].total
+
+    return render.links([AutoMapper('link', x) for x in links], span, web.ctx.path, offset, limit, total)
+    
 class index:
     def GET(self):
-        links = db.select('1_links', limit=50, order="timestamp DESC")
-        return render.index([AutoMapper('link', x) for x in links])
+        return render_links()
+
+class links:
+    def GET(self, year, month, day):
+        def tidy(v, low, high):
+            """Turn an optional parameter into a validated number"""
+            if v:
+                v = int(v[1:])
+                if v < low or v > high:
+                    raise web.notfound()
+
+                return False, v
+            else:
+                return True, low
+
+        no_year, year = tidy(year, 1990, 2037)
+        no_month, month = tidy(month, 1, 12)
+        no_day, day = tidy(day, 1, 31)
+
+        start = datetime.date(year, month, day)
+        span = None
+
+        # Figure out the span based on what was supplied
+        if no_year:
+            end = datetime.date(year + 100, month, day)
+            span = 'years'
+        elif no_month:
+            end = datetime.date(year + 1, month, day)
+            span = 'months'
+        elif no_day:
+            if month == 12:
+                end = datetime.date(year + 1, 1, day)
+            else:
+                end = datetime.date(year, month + 1, day)
+        else:
+            end = start + datetime.timedelta(days=1)
+
+        tstart = time.mktime(start.timetuple())
+        tend = time.mktime(end.timetuple())
+
+        return render_links(where='timestamp >= $tstart and timestamp < $tend', 
+                          vars={ 'tstart': tstart, 'tend': tend }, span=span)
 
 class link:
     def GET(self, id):
@@ -401,6 +476,11 @@ class user:
     def GET(self, id):
         user = first('user', 'username', id)
         return render.user(user)
+
+class user_links:
+    def GET(self, id):
+        user = first('user', 'username', id)
+        return render_links(where='userID=$id', vars={'id': user.userID})
 
 class login:
     login = web.form.Form(
