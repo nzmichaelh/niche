@@ -22,3 +22,5 @@ urls_need_a_description = "URLs need a description"
 login_required = "Login required"
 liked = "Liked"
 permission_denied = "Permission denied"
+admin_needed_to_delete_a_comment = 'Admin needed to delete a comment'
+bad_username_or_password = "Bad username or password"
