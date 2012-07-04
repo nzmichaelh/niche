@@ -35,6 +35,7 @@ DEFAULTS = [
     ( 'general', {
             'dateformat': '%B %d, %Y',
             'base': '/',
+            'wsgi': 'false',
             }),
     ( 'db', {
             'db': 'niche',
@@ -42,7 +43,8 @@ DEFAULTS = [
             'password': 'whatever',
             }),
     ( 'site', {
-            'name': 'Nichefilter'
+            'name': 'Nichefilter',
+            'subtitle': 'of no fixed subtitle',
             }),
     ]
 
@@ -75,6 +77,9 @@ db = web.database(dbn='mysql',
                   pw=config.get('db', 'password'),
                   db=config.get('db','db')
                   )
+
+def now():
+    return time.time()
 
 class AutoMapper:
     def __init__(self, type, around):
@@ -469,3 +474,5 @@ if __name__ == "__main__":
     else:
         # Development machine.  Run stand alone
         pass
+
+    app.run()
