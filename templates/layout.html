@@ -6,10 +6,9 @@ $ active = model.get_active()
 <html>
   <head>
     <title>$config.get('site', 'name')</title>
-    <link rel="stylesheet" type="text/css" href="static/style.css">
     $ base = config.get('general', 'base')
-    $if base:
-        <base href="$base"/>
+    $if base: <base href="$base"/>
+    <link rel="stylesheet" type="text/css" href="static/style.css">
   </head>
   <body>
     <h1><a href="">$config.get('site', 'name')</a></h1>
