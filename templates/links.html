@@ -1,4 +1,4 @@
-$def with (links)
+$def with (links, span, base, offset, limit, total)
 
 $ last_date = None
 
@@ -6,7 +6,7 @@ $for link in links:
     $ date = link.to_datestr()
     $if date != last_date:
         <h2>
-	  <a href="daily/$link.to_date_link()">$date</a>
+	  <a href="links/$link.to_date_link()">$date</a>
 	</h2>
 	$ last_date = date
 
@@ -25,3 +25,11 @@ $for link in links:
     -
     <a href="link/$link.linkID">$len(link.comments) comments</a>
     </div>
+
+$if total > limit:
+    Page
+    $ at = 1 + offset // limit
+    $for i in range(0, total, limit):
+        $if loop.index == at: <b>
+        <a href="$base?offset=$i">$loop.index</a>
+        $if loop.index == at: </b>
