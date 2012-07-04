@@ -217,16 +217,20 @@ def url_validator(v):
 
     return re.match('(http|https|ftp|mailto)://.+', v)
 
+def redirect(url):
+    """Bounce to a different site absolute URL."""
+    raise web.seeother(url, absolute=True)
+
 def authenticate(msg=_("Login required")):
     if not session.get('userID', None):
         model.inform(msg)
-        raise web.seeother('/login')            
+        redirect('/login')            
 
 def error(message, condition, target='/'):
     """Log an error if condition is true and bounce to somewhere."""
     if condition:
         model.inform(message)
-        raise web.seeother(target)
+        redirect(target)
 
 def render_input(v):
     """Tidy up user input and insert breaks for empty lines."""
@@ -306,7 +310,7 @@ class new_link:
                          )
 
         model.inform(_("New post success"))
-        return web.seeother('/link/%d' % next)
+        return web.redirect('/link/%d' % next)
 
 class hide_link:
     def GET(self, id):
@@ -315,7 +319,7 @@ class hide_link:
         db.update('1_links', where='linkID = $id', hidden=next, vars={'id': id})
 
         model.inform(_("Link is hidden") if next else _("Link now shows"))
-        raise web.seeother('/link/%s' % id)
+        redirect('/link/%s' % id)
 
 class close_link:
     def GET(self, id):
@@ -324,7 +328,7 @@ class close_link:
         db.update('1_links', where='linkID = $id', closed=next, vars={'id': id})
 
         model.inform(_("Link is closed") if next else _("Link is open"))
-        raise web.seeother('/link/%s' % id)
+        redirect('/link/%s' % id)
 
 class new_comment:
     form = web.form.Form(
@@ -364,7 +368,7 @@ class new_comment:
                          )
 
         model.inform(_("New comment success"))
-        return web.seeother('/link/%d' % link.linkID)
+        return web.redirect('/link/%d' % link.linkID)
 
 class delete_comment:
     def GET(self, id):
@@ -372,7 +376,7 @@ class delete_comment:
         db.delete('1_comments', where='commentID = $id', vars={'id': id})
 
         model.inform(_("Comment deleted"))
-        raise web.seeother('/link/%s' % comment.linkID)
+        redirect('/link/%s' % comment.linkID)
 
 class like_comment:
     def GET(self, id):
@@ -383,7 +387,7 @@ class like_comment:
         db.insert('1_likes', commentID=comment.commentID, userID=userID)
 
         model.inform(_("Liked"))
-        raise web.seeother('/link/%s' % comment.linkID)
+        redirect('/link/%s' % comment.linkID)
 
 class user:
     def GET(self, id):
@@ -425,14 +429,14 @@ class login:
         session.userID = user.userID
 
         model.inform(_("Logged in"))
-        raise web.seeother('/')
+        redirect('/')
 
 class logout:
     def GET(self):
         session.userID = None
 
         model.inform(_("Logged out"))
-        raise web.seeother('/')
+        redirect('/')
 
 class password:
     form = web.form.Form(
@@ -465,7 +469,7 @@ class password:
         db.update('1_users', password=pwd_context.encrypt(form.d.password), where='username=$id', vars={'id': id})
         
         model.inform(_("Password changed"))
-        raise web.seeother('/user/%s' % id)
+        redirect('/user/%s' % id)
 
 if __name__ == "__main__":
     if config.getboolean('general', 'wsgi'):
