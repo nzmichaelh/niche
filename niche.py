@@ -143,7 +143,8 @@ def first(type, column, id):
 class Model:
     """Top level helpers.  Exposed to scripts."""
     def is_admin(self):
-        return True
+        id = session.get('userID', None)
+        return id != None and id <= 2
 
     def get_link(self, id):
         """Get a link by link ID"""
@@ -223,6 +224,11 @@ def redirect(url):
 
 def authenticate(msg=_("Login required")):
     if not session.get('userID', None):
+        model.inform(msg)
+        redirect('/login')            
+
+def need_admin(msg):
+    if not model.is_admin():
         model.inform(msg)
         redirect('/login')            
 
@@ -373,6 +379,8 @@ class new_comment:
 class delete_comment:
     def GET(self, id):
         comment = model.get_comment(id)
+
+        need_admin(_('Admin needed to delete a comment'))
         db.delete('1_comments', where='commentID = $id', vars={'id': id})
 
         model.inform(_("Comment deleted"))
@@ -410,20 +418,17 @@ class login:
             return render.login(form)
 
         user = first_or_none('user', 'username', form.d.username)
-
-        if not user:
-            form.valid = False
-            return render.login(form)
-
         ok = False
 
-        try:
-            ok = passlib.hash.mysql323.verify(form.d.password, user.password)
-        except ValueError:
-            ok = pwd_context.verify(form.d.password, user.password)
+        if user:
+            try:
+                ok = passlib.hash.mysql323.verify(form.d.password, user.password)
+            except ValueError:
+                ok = pwd_context.verify(form.d.password, user.password)
 
         if not ok:
             form.valid = False
+            model.inform(_("Bad username or password"))
             return render.login(form)
 
         session.userID = user.userID
