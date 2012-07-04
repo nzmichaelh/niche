@@ -32,7 +32,7 @@ def ago(timestamp):
     elif months < 24:
         v, suffix = months, 'month'
     else:
-        v, suffix = years, 'years'
+        v, suffix = years, 'year'
 
     v = int(v)
 
