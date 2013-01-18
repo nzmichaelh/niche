@@ -1,3 +1,8 @@
+Dependancies
+------------
+apt-get install python-passlib python-webpy python-pip python-mysqldb
+pip install bleach
+
 mysql
 -----
 
@@ -8,7 +13,7 @@ mysql -u root -p niche
 CREATE USER 'niche'@'localhost' IDENTIFIED BY 'whatever';
 GRANT ALL PRIVILEGES ON niche.* TO 'niche'@'localhost';
 
-mysql -u niche -p < niche.sql
+mysql -u niche -p niche < schema.sql
 
 Sanitizing
 ----------
