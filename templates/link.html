@@ -34,9 +34,10 @@ $for comment in comments:
     $ user = comment.user
     posted by <a href="user/$user.username">$user.username</a>
     $link.ago() ago
-    $ likes = comment.likes
-    | $len(likes) likes
-    | <a href="comment/$comment.commentID/like">I like it</a>
+    $if features.likes:
+        $ likes = comment.likes
+        | $len(likes) likes
+        | <a href="comment/$comment.commentID/like">I like it</a>
     $if model.is_admin():
         | <a href="comment/$comment.commentID/delete">Delete</a>
     </div>

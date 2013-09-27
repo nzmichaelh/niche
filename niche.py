@@ -66,6 +66,18 @@ def read_config():
 
 config = read_config()
 
+FEATURES = 'likes'.split()
+
+def get_features(config):
+    features = web.utils.Storage()
+
+    for feature in FEATURES:
+        features[feature] = config.has_option('features', feature) and config.getboolean('features', feature)
+
+    return features
+
+features = get_features(config)
+
 def get_string(id):
     """Get a string gettext style.  Splits the strings from the
     code.
@@ -80,6 +92,11 @@ db = web.database(dbn='mysql',
                   pw=config.get('db', 'password'),
                   db=config.get('db','db')
                   )
+
+
+def require_feature(name):
+    if not features[name]:
+        raise web.notfound()
 
 def now():
     return time.time()
@@ -206,7 +223,7 @@ model = Model()
 
 render = web.template.render('templates/',
                              base='layout',
-                             globals={ 'model': model, 'config': config },
+                             globals={ 'model': model, 'config': config, 'features': features },
                              )
 
 app = web.application(urls, locals())
@@ -463,6 +480,7 @@ class delete_comment:
 
 class like_comment:
     def GET(self, id):
+        check_feature('likes')
         authenticate(_("Login to like"))
         comment = model.get_comment(id)
 
