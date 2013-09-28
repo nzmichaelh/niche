@@ -3,7 +3,7 @@ $def with (link, form, preview)
 $ here = "link/%s" % link.linkID
 
 $ date = link.to_datestr()
-<h2>
+<h2 class="entry-title">
   <a href="daily/$link.to_date_link()">$date</a>
 </h2>
 
@@ -27,11 +27,12 @@ $link.ago() ago
 
 $ comments = link.comments
 
+<ul class="commentlist">
 $for comment in comments:
+    <li>
     <div class="comment">
-    <p>
     $:comment.content
-    <p class="byline">
+    <footer>
     $ user = comment.user
     posted by <a href="user/$user.username">$user.username</a>
     $link.ago() ago
@@ -41,18 +42,21 @@ $for comment in comments:
         | <a href="comment/$comment.commentID/like">I like it</a>
     $if model.is_admin():
         | <a href="comment/$comment.commentID/delete">Delete</a>
+    </footer>
     </div>
+</ul>
 
 $if not link.closed:
     $if form:
         <a id="comment"></a>
         $if preview != None:
             <p class="preview">$:preview
-        <p>
+        <div id="commentform">
         <form name="main" method="post"> 
 	  $:form.render()
 	  <input type="submit" name="post" value="Post"/>
 	  <input type="submit" name="preview" value="Preview"/>
 	</form>
+        </div>
     $else:
         <p><a href="/link/$link.linkID/new#comment">New comment</a>

@@ -5,25 +5,25 @@ $ last_date = None
 $for link in links:
     $ date = link.to_datestr()
     $if date != last_date:
-        <h2>
+        <h1 class="entry-title">
 	  <a href="links/$link.to_date_link()">$date</a>
-	</h2>
+	</h1>
 	$ last_date = date
 
-    <div class="link">
-    <p>
+    <div class="entry-summary">
     $if not link.URL:
-        <b>$link.title</b>
+        $link.title
     $else:
         <a href="$link.URL">$:link.URL_description</a>
     $:link.description
     $if link.extended:
-        [<a href="link/$link.linkID">more inside</a>]
-    <p class="byline">
-    posted by <a href="user/$link.user.username">$link.user.username</a>
-    $link.ago() ago
-    -
-    <a href="link/$link.linkID">$len(link.comments) comments</a>
+        <a href="link/$link.linkID" class="more-link">more inside</a>
+    </div>
+    <div class="entry-meta">
+      posted by <a href="user/$link.user.username">$link.user.username</a>
+      $link.ago() ago
+      -
+      <a href="link/$link.linkID">$len(link.comments) comments</a>
     </div>
 
 $if total > limit:

@@ -5,33 +5,53 @@ $ active = model.get_active()
 <!DOCTYPE html>
 <html>
   <head>
+    <meta name="viewport" content="width=device-width" />
     <title>$config.get('site', 'name')</title>
     $ base = config.get('general', 'base')
     $if base: <base href="$base"/>
-    <link rel="stylesheet" type="text/css" href="static/style.css">
+    <link rel="stylesheet" type="text/css" href="static/themes/able-wpcom/style.css">
   </head>
   <body>
-    <h1><a href="">$config.get('site', 'name')</a></h1>
-    <div id="navigation">
-      <ul>
-	$if active:
-	    <li><a href="user/$active.username">$active.username</a>
-	    <li><a href="logout">Logout</a>
-	$else:
-	    <li><a href="login">Login</a>
-        <li><a href="link/new">New post</a>
-        <li><a href="links">Archive</a>
-        <li><a href="https://github.com/nzmichaelh/niche/issues">Support</a>
-      </ul>
-    </div>
-    <div class="spacer">
-    </div>
-    <div id="content">
-      $ message = model.get_message()
-      $if message:
-          <p class="message">$message</p>
-      <div id="body">
-	$:content
+    <div id="page" class="hfeed site">
+      <div id="site-introduction">
+        <h1 class="site-title"><a href="">$config.get('site', 'name')</a></h1>
+        <h2 class="site-description">$config.get('site', 'subtitle')</h2>
+      </div>
+      <div id="page-liner">
+        <header id="masthead" class="site-header" role="banner">
+          <nav role="navigation" class="site-navigation main-navigation">
+            <ul>
+            $if active:
+              <li><a href="user/$active.username">$active.username</a>
+              <li><a href="logout">Logout</a>
+            $else:
+              <li><a href="login">Login</a>
+            <li><a href="link/new">New post</a>
+            <li><a href="links">Archive</a>
+            </ul>
+          </nav>
+        </header>
+        <div id="main">
+          $ message = model.get_message()
+          $if message:
+            <p class="message">$message</p>
+          <div id="primary" class="site-content">
+            <div id="content" role="main">
+              $:content
+            </div>
+          </div>
+        </div>
+	<footer id="colophon" class="site-footer" role="contentinfo">
+          <div class="site-info">
+            A <a href="https://juju.net.nz/src/niche.git/">niche</a> community filter
+	    <span class="sep"> | </span>
+            Version $version
+	    <span class="sep"> | </span>
+            <a href="https://github.com/nzmichaelh/niche/issues">Bugs</a>
+	    <span class="sep"> | </span>
+            Theme based on <a href="http://abledemo.wordpress.com/">Able</a>
+          </div>
+        </footer>
       </div>
     </div>
   </body>
