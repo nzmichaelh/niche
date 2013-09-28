@@ -6,6 +6,7 @@ import ConfigParser
 import passlib
 import re
 import time
+import subprocess
 
 import web
 import bleach
@@ -82,6 +83,9 @@ def get_features(config):
 
 features = get_features(config)
 
+def get_version():
+    return subprocess.check_output('git describe --always --dirty'.split()).strip()
+
 def get_string(id):
     """Get a string gettext style.  Splits the strings from the
     code.
@@ -96,7 +100,6 @@ db = web.database(dbn='mysql',
                   pw=config.get('db', 'password'),
                   db=config.get('db','db'),
                   )
-
 
 def require_feature(name):
     if not features[name]:
@@ -225,10 +228,16 @@ class Model:
 
 model = Model()
 
-render = web.template.render('templates/',
-                             base='layout',
-                             globals={ 'model': model, 'config': config, 'features': features },
-                             )
+render = web.template.render(
+    'templates/',
+    base='layout',
+    globals={
+        'model': model,
+        'config': config,
+        'features': features,
+        'version': get_version(),
+        },
+    )
 
 app = web.application(urls, locals())
 
