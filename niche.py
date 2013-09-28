@@ -41,6 +41,9 @@ DEFAULTS = [
             'wsgi': 'false',
             'limit': 50,
             }),
+    ( 'groups', {
+            'admins': '',
+            }),
     ( 'db', {
             'db': 'niche',
             'user': 'niche',
@@ -178,7 +181,7 @@ class Model:
     """Top level helpers.  Exposed to scripts."""
     def is_admin(self):
         id = session.get('userID', None)
-        return id != None and id <= 2
+        return id != None and (str(id) in config.get('groups', 'admins').split())
 
     def get_link(self, id):
         """Get a link by link ID"""
@@ -414,6 +417,8 @@ class new_link:
 class hide_link:
     def GET(self, id):
         link = model.get_link(id)
+        need_admin(_('Admin needed to hide a link'))
+
         next = not link.hidden
         db.update('1_links', where='linkID = $id', hidden=next, vars={'id': id})
 
@@ -423,6 +428,8 @@ class hide_link:
 class close_link:
     def GET(self, id):
         link = model.get_link(id)
+
+        need_admin(_('Admin needed to close a link'))
         next = not link.closed
         db.update('1_links', where='linkID = $id', closed=next, vars={'id': id})
 

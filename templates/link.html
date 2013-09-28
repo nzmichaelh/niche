@@ -7,10 +7,11 @@ $ date = link.to_datestr()
   <a href="daily/$link.to_date_link()">$date</a>
 </h2>
 
-<p class="meta">
-  <a href="$here/hide">${ "Hidden" if link.hidden else "Showing" }</a> |
-  <a href="$here/close">${ "Closed" if link.closed else "Open for comments" }</a>
-</p>
+$if model.is_admin():
+  <p class="meta">
+    <a href="$here/hide">${ "Hidden" if link.hidden else "Showing" }</a> |
+    <a href="$here/close">${ "Closed" if link.closed else "Open for comments" }</a>
+  </p>
 
 $if not link.URL:
     <b>$link.title</b>

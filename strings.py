@@ -23,4 +23,6 @@ login_required = "Login required"
 liked = "Liked"
 permission_denied = "Permission denied"
 admin_needed_to_delete_a_comment = 'Admin needed to delete a comment'
+admin_needed_to_hide_a_link = 'Admin needed to hide a link'
+admin_needed_to_close_a_link = 'Admin needed to close a link'
 bad_username_or_password = "Bad username or password"
