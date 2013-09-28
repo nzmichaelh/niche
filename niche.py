@@ -70,7 +70,7 @@ def read_config():
 
 config = read_config()
 
-FEATURES = 'likes'.split()
+FEATURES = 'likes gravatar'.split()
 
 def get_features(config):
     features = web.utils.Storage()
