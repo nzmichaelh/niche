@@ -84,7 +84,7 @@ def get_features(config):
 features = get_features(config)
 
 def get_version():
-    return subprocess.check_output('git describe --always --dirty'.split()).strip()
+    return subprocess.check_output('git describe --always --dirty --long'.split()).strip()
 
 def get_string(id):
     """Get a string gettext style.  Splits the strings from the
