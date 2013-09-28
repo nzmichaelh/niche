@@ -1,0 +1,226 @@
+/*
+Theme Name: Able
+
+Adding support for language written in a Right To Left (RTL) direction is easy -
+it's just a matter of overwriting all the horizontal positioning attributes
+of your CSS stylesheet in a separate stylesheet file named rtl.css.
+
+http://codex.wordpress.org/Right_to_Left_Language_Support
+
+*/
+
+
+body {
+	direction: rtl;
+	unicode-bidi: embed;
+}
+
+
+/* =Lists
+-------------------------------------------------------------- */
+
+dd {
+	margin: 0 26px 0 0;
+}
+ul,
+ol {
+	margin: 0 0 26px 26px;
+	padding-right: 26px;
+}
+
+
+/* =Forms and Inputs
+-------------------------------------------------------------- */
+
+form {
+	float: right;
+}
+
+
+/* =Page Structure
+-------------------------------------------------------------- */
+
+#content {
+	float: right;
+}
+.left-sidebar #primary { /* Left sidebar widget area currently active */
+	margin: 0 25% 0 0;
+}
+.three-columns #primary { /* both left sidebar widget and right sidebar widget are currently active */
+	margin: 0 25% 0 2%;
+}
+.left-sidebar #secondary {
+	margin: 0 -100% 0 0;
+}
+.three-columns #secondary {
+	margin: 0 -77% 0 0;
+}
+#tertiary { /* Right sidebar */
+	margin-left: 0;
+}
+
+
+/* =Header
+-------------------------------------------------------------- */
+
+#masthead {
+	float: right;
+}
+
+
+/* =Site Navigation
+-------------------------------------------------------------- */
+
+.site-navigation {
+	float: right;
+}
+.nav-previous,
+.nav-next {
+	float: right;
+}
+.nav-next {
+	text-align: left;
+}
+
+
+/* =Navigation Menu
+-------------------------------------------------------------- */
+
+.main-navigation {
+	float: right;
+}
+.main-navigation li {
+	float: right;
+}
+.main-navigation ul ul {
+	float: right;
+}
+.main-navigation ul ul ul {
+	right: 180px;
+}
+
+
+/* =Entries
+-------------------------------------------------------------- */
+
+.hentry {
+	float: right;
+}
+.post-edit-link {
+	left: 26px;
+	right: auto;
+}
+.entry-attachment {
+	float: right;
+}
+
+
+/* =Comments TODO
+-------------------------------------------------------------- */
+
+.commentlist .children {
+	padding-right: 26px;
+}
+.commentlist .avatar {
+	float: right;
+	margin-left: 13px;
+}
+.comment-content,
+.reply {
+	padding-right: 65px;
+}
+
+
+/* =Widgets
+----------------------------------------------- */
+
+.widget-area ul ul {
+	padding-right: 26px;
+}
+.widget-area tfoot td {
+	text-align: right;
+}
+.widget-area tfoot #next {
+	text-align: left;
+}
+.widget {
+	float: right;
+}
+
+
+/* =Footer
+----------------------------------------------- */
+
+.footer-navigation {
+	float: right;
+}
+.footer-navigation li {
+	float: right;
+}
+.footer-navigation a {
+	border-left: 1px solid rgb( 200, 200, 200 ); /* #c8c8c8 */
+	border-left: 1px solid rgba( 200, 200, 200, .8 );
+	padding: 0 6px 0 8px;
+}
+.footer-navigation li:first-child a {
+	padding: 0 0 0 8px;
+}
+.footer-navigation li:last-child a {
+	padding: 0 6px 0 0;
+}
+
+
+/* =WordPress.com Digg Button
+----------------------------------------------- */
+
+.db-wrapper {
+	margin: 0 0 10px 10px;
+}
+
+
+/* =Media Queries
+----------------------------------------------- */
+
+@media only screen and (min-width: 320px) and (max-width: 320px) {
+	body,
+	#wpadminbar {
+		width: 372px;
+	}
+}
+@media only screen and ( min-width: 320px ) and ( max-width: 480px ) {
+	#primary,
+	.right-sidebar #primary,
+	.left-sidebar #primary,
+	#secondary,
+	#tertiary {
+		width: 100%;
+	}
+	.left-sidebar #primary,
+	.three-columns #primary,
+	.left-sidebar #secondary,
+	.three-columns #secondary,
+	#tertiary {
+		margin: 0;
+	}
+}
+@media only screen and ( min-width: 481px ) and ( max-width: 800px ) {
+	#primary,
+	.right-sidebar #primary,
+	.left-sidebar #primary,
+	.left-sidebar #secondary,
+	.right-sidebar #tertiary {
+		width: 100%;
+	}
+	.left-sidebar #primary,
+	.three-columns #primary,
+	.left-sidebar #secondary {
+		margin: 0;
+	}
+	#secondary,
+	#tertiary {
+		width: 48%;
+	}
+	.three-columns #secondary {
+		margin: 0 0 0 4%;
+	}
+}
