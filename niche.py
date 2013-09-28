@@ -226,6 +226,23 @@ class Model:
 
         return first_or_none('user', 'userID', id)
 
+    def paginate(self, offset, total, per_page):
+        # TODO(michaelh): really a helper, not part of the model.
+        page = 1 + offset // per_page
+        pages = total // per_page
+        for step in (1, 2, 5, 10, 20, 50):
+            if pages / step <= 6:
+                break
+        if pages > 1:
+            indexes = set([1, 2, pages, pages-1, page] + range(step, pages, step))
+            if page > 1:
+                indexes.add(page-1)
+            if page < pages:
+                indexes.add(page+1)
+        else:
+            indexes = []
+        return page, sorted(indexes)
+        
 model = Model()
 
 render = web.template.render(

@@ -26,10 +26,10 @@ $for link in links:
       <a href="link/$link.linkID">$len(link.comments) comments</a>
     </div>
 
-$if total > limit:
+$ at, pages = model.paginate(offset, total, limit)
+$if pages:
     Page
-    $ at = 1 + offset // limit
-    $for i in range(0, total, limit):
-        $if loop.index == at: <b>
-        <a href="$base?offset=$i">$loop.index</a>
-        $if loop.index == at: </b>
+    $for page in pages:
+        $if page == at: <b>
+        <a href="$base?offset=${(page-1)*limit}">$page</a>
+        $if page == at: </b>
