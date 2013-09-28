@@ -1,0 +1,24 @@
+$def with (comments)
+
+$ last = None
+
+$for comment in comments:
+  $if last != comment.linkID:
+    $ last = comment.linkID
+    $ link = comment.link
+
+    <h2>In
+    $if not link.URL:
+      "<a href="link/$link.linkID">$link.title</a>"
+    $else:
+      "<a href="link/$link.linkID">$:link.URL_description</a>"
+    </h2>
+  <div class="comment">
+  <p>
+  $:comment.content
+  <p class="byline">
+  $ user = comment.user
+  posted by <a href="user/$user.username">$user.username</a>
+  $comment.ago() ago
+
+<p>(limited to the most recent $config.get('general', 'limit') comments)

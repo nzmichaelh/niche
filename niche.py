@@ -26,6 +26,7 @@ urls = (
     '/comment/(\d+)/like', 'like_comment',
     '/user/([^/]+)', 'user',
     '/user/([^/]+)/links', 'user_links',
+    '/user/([^/]+)/comments', 'user_comments',
     '/user/([^/]+)/password', 'password',
     '/login', 'login',
     '/logout', 'logout',
@@ -90,7 +91,7 @@ _ = get_string
 db = web.database(dbn='mysql',
                   user=config.get('db', 'user'),
                   pw=config.get('db', 'password'),
-                  db=config.get('db','db')
+                  db=config.get('db','db'),
                   )
 
 
@@ -499,6 +500,14 @@ class user_links:
     def GET(self, id):
         user = first('user', 'username', id)
         return render_links(where='userID=$id', vars={'id': user.userID})
+
+class user_comments:
+    def GET(self, id):
+        user = first('user', 'username', id)
+        comments = db.select('1_comments', where='userID=$id', order='timestamp DESC',
+                             vars={'id': user.userID},
+                             limit=config.get('general', 'limit'))
+        return render.user_comments([AutoMapper('comment', x) for x in comments])
 
 class login:
     login = web.form.Form(
