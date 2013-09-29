@@ -1,0 +1,26 @@
+.meta {
+    background-color: lightblue;
+    border: 1px solid blue;
+    padding: 0.3em;
+}
+
+.message {
+    background-color: lightgreen;
+    border: 1px solid green;
+    padding: 0.3em;
+}
+
+.error {
+    background-color: pink;
+    border: 1px solid red;
+    padding: 0.3em;
+}
+
+.wrong {
+}
+
+.preview {
+    background-color: #e0e0e0;
+    border: 1px solid #101010;
+    padding: 0.3em;
+}
