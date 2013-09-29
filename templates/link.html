@@ -56,7 +56,7 @@ $for comment in comments:
 $if not link.closed:
   <a id="comment"></a>
   $if preview:
-    <p class="preview">$:preview
+    <div class="preview">$:preview</div><p>
   <div id="commentform">
     <form name="main" method="post" action="$here/new"> 
       $:form.render()

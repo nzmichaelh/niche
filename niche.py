@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import ConfigParser
 import passlib
+import markdown
 import re
 import time
 import subprocess
@@ -40,6 +41,7 @@ DEFAULTS = [
             'dateformat': '%B %d, %Y',
             'base': '/',
             'wsgi': 'false',
+            'extra_tags': 'p pre',
             'limit': 50,
             }),
     ( 'groups', {
@@ -56,16 +58,21 @@ DEFAULTS = [
             }),
     ]
 
+class Config(ConfigParser.RawConfigParser):
+    def set_defaults(self, defaults):
+        for section, items in defaults:
+            self.add_section(section)
+
+            for name, value in items.items():
+                self.set(section, name, value)
+
+    def getlist(self, section, option):
+        return self.get(section, option).split()
+
 def read_config():
     """Set up the defaults and read in niche.ini, if any."""
-    cfg = ConfigParser.RawConfigParser()
-
-    for section, items in DEFAULTS:
-        cfg.add_section(section)
-
-        for name, value in items.items():
-            cfg.set(section, name, value)
-
+    cfg = Config()
+    cfg.set_defaults(DEFAULTS)
     cfg.read('niche.ini')
     return cfg
 
@@ -184,7 +191,7 @@ class Model:
     """Top level helpers.  Exposed to scripts."""
     def is_admin(self):
         id = session.get('userID', None)
-        return id != None and (str(id) in config.get('groups', 'admins').split())
+        return id != None and (str(id) in config.getlist('groups', 'admins'))
 
     def get_link(self, id):
         """Get a link by link ID"""
@@ -301,19 +308,25 @@ def error(message, condition, target='/'):
         model.inform(message)
         redirect(target)
 
-def render_input(v):
+def render_input(v, use_markdown=False):
     """Tidy up user input and insert breaks for empty lines."""
-    v = bleach.clean(v)
-    
-    out = ''
+    tags = bleach.ALLOWED_TAGS + config.getlist('general', 'extra_tags')
 
-    for line in v.split('\n'):
-        if not line.strip():
-            out += '<br/>\n'
-        else:
-            out += line + '\n'
+    if use_markdown:
+        return bleach.clean(
+            markdown.markdown(v, output_format='html5'),
+            tags=tags)
+    else:
+        v = bleach.clean(v, tags=tags)
+        out = ''
 
-    return out
+        for line in v.split('\n'):
+            if not line.strip():
+                out += '<br/>\n'
+            else:
+                out += line + '\n'
+
+        return out
 
 def render_links(where=None, span=None, vars={}):
     input = web.input()
@@ -392,6 +405,7 @@ class new_link:
         web.form.Textbox('url_description'),
         web.form.Textarea('description', rows=10, cols=80),
         web.form.Textarea('extended', rows=10, cols=80),
+        web.form.Checkbox('use_markdown', value='use_markdown'),
         validators = [
             web.form.Validator(_("URLs need a description"), lambda x: x.url_description if x.url else True),
             web.form.Validator(_("Need a URL or description"), lambda x: x.url or x.description),
@@ -414,9 +428,10 @@ class new_link:
             return render.new_link(form, None)
 
         user = model.get_active()
-        url_description = render_input(form.d.url_description)
-        description = render_input(form.d.description)
-        extended = render_input(form.d.extended)
+        markdown = form.d.use_markdown
+        url_description = render_input(form.d.url_description, markdown)
+        description = render_input(form.d.description, markdown)
+        extended = render_input(form.d.extended, markdown)
 
         if 'preview' in web.input():
             preview = web.utils.Storage(
@@ -465,7 +480,8 @@ class close_link:
 
 class new_comment:
     form = web.form.Form(
-        web.form.Textarea('content', web.form.notnull, rows=10, cols=80)
+        web.form.Textarea('content', web.form.notnull, rows=10, cols=80),
+        web.form.Checkbox('use_markdown', value='use_markdown'),
         )
 
     def check(self, id):
@@ -484,7 +500,7 @@ class new_comment:
             return render.link(link, form, None)
 
         user = model.get_active()
-        content = render_input(form.d.content)
+        content = render_input(form.d.content, form.d.use_markdown)
 
         if 'preview' in web.input():
             return render.link(link, form, content)
