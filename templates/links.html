@@ -12,7 +12,7 @@ $for link in links:
 
     <div class="entry-summary">
     $if not link.URL:
-        $link.title
+        <b>$link.title</b>
     $else:
         <a href="$link.URL">$:link.URL_description</a>
     $:link.description

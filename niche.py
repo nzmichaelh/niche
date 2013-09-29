@@ -382,7 +382,8 @@ class links:
 class link:
     def GET(self, id):
         link = model.get_link(id)
-        return render.link(link, None, False)
+        form = new_comment.form()
+        return render.link(link, form, False)
 
 class new_link:
     form = web.form.Form(
@@ -474,10 +475,6 @@ class new_comment:
         error(_("Link is closed"), link.closed)
 
         return link
-
-    def GET(self, id):
-        link = self.check(id)
-        return render.link(link, self.form(), None)
 
     def POST(self, id):
         link = self.check(id)

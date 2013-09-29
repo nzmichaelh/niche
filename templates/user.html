@@ -15,6 +15,8 @@ $:user.bio
 
 <p>
   <a href="user/$user.username/links">$len(user.links) links</a>
-| <a href="user/$user.username/comments">$len(user.comments) comments</a>
+  <span class="sep"> | </span>
+  <a href="user/$user.username/comments">$len(user.comments) comments</a>
 $if features.likes:
-  | <a href="user/$user.username/likes">$len(user.likes) likes</a>
+  <span class="sep"> | </span>
+  <a href="user/$user.username/likes">$len(user.likes) likes</a>
