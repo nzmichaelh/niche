@@ -41,7 +41,7 @@ DEFAULTS = [
     ( 'general', {
             'dateformat': '%B %d, %Y',
             'base': '/',
-            'wsgi': 'false',
+            'server_type': 'dev',
             'extra_tags': 'p pre',
             'limit': 50,
             }),
@@ -651,11 +651,15 @@ class password:
         redirect('/user/%s' % id)
 
 if __name__ == "__main__":
-    if config.getboolean('general', 'wsgi'):
+    server_type = config.get('general', 'server_type')
+
+    if server_type == 'fastcgi':
         web.config.debug = False
         web.wsgi.runwsgi = lambda func, addr=None: web.wsgi.runfcgi(func, addr)
-    else:
+    elif server_type == 'dev':
         # Development machine.  Run stand alone
         pass
+    else:
+        raise ValueError('Unhandled server_type "%s"' % server_type)
 
     app.run()
