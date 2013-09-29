@@ -13,6 +13,7 @@ $ active = model.get_active()
     $ base = config.get('general', 'base')
     $if base: <base href="$base"/>
     <link rel="stylesheet" type="text/css" href="static/themes/able-wpcom/style.css">
+    <link rel="stylesheet" type="text/css" href="static/themes/common/niche.css">
   </head>
   <body>
     <div id="page" class="hfeed site">
@@ -35,10 +36,10 @@ $ active = model.get_active()
           </nav>
         </header>
         <div id="main">
-          $ message = model.get_message()
-          $if message:
-            <p class="message">$message</p>
           <div id="primary" class="site-content">
+            $ message = model.get_message()
+            $if message:
+              <p class="message">$message</p>
             <div id="content" role="main">
               $:content
             </div>
