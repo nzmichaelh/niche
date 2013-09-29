@@ -1,4 +1,21 @@
-$def with (links, span, base, offset, limit, total)
+$def with (links, span, base, offset, limit, total, date_range)
+
+$if date_range:
+  $for year in date_range.years:
+    $if not loop.first: <span class="sep"> | </span>
+    $if year == date_range.year: <b>
+    <a href="links/$year">$year</a>
+    $if year == date_range.year: </b>
+  <br/>
+  $if date_range.month is None: <b>
+  <a href="links/$date_range.year">Whole year</a>
+  $if date_range.month is None: </b>
+  $for i in range(1, len(date_range.months)):
+      <span class="sep"> | </span>
+      $if i == date_range.month: <b>
+      <a href="links/$date_range.year/$i">$date_range.months[i]</a>
+      $if i == date_range.month: </b>
+  <hr/>
 
 $ last_date = None
 

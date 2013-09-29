@@ -8,6 +8,7 @@ import markdown
 import re
 import time
 import subprocess
+import calendar
 
 import web
 import bleach
@@ -328,7 +329,7 @@ def render_input(v, use_markdown=False):
 
         return out
 
-def render_links(where=None, span=None, vars={}):
+def render_links(where=None, span=None, vars={}, date_range=None):
     input = web.input()
     offset = int(input.get('offset', 0))
     offset = max(offset, 0)
@@ -345,8 +346,8 @@ def render_links(where=None, span=None, vars={}):
 
     total = results[0].total
 
-    return render.links([AutoMapper('link', x) for x in links], span, web.ctx.path, offset, limit, total)
-    
+    return render.links([AutoMapper('link', x) for x in links], span, web.ctx.path, offset, limit, total, date_range)
+
 class index:
     def GET(self):
         return render_links()
@@ -373,7 +374,9 @@ class links:
 
         # Figure out the span based on what was supplied
         if no_year:
-            end = datetime.date(year + 100, month, day)
+            # Work around the year 2038 problem.
+            end_year = min(2037, year + 100)
+            end = datetime.date(end_year, month, day)
             span = 'years'
         elif no_month:
             end = datetime.date(year + 1, month, day)
@@ -385,12 +388,30 @@ class links:
                 end = datetime.date(year, month + 1, day)
         else:
             end = start + datetime.timedelta(days=1)
+        print start, end, span
 
         tstart = time.mktime(start.timetuple())
         tend = time.mktime(end.timetuple())
 
-        return render_links(where='timestamp >= $tstart and timestamp < $tend', 
-                          vars={ 'tstart': tstart, 'tend': tend }, span=span)
+        # Pull the oldest and youngest from the database.
+        limits = db.query('SELECT MIN(timestamp) as first, MAX(timestamp) as last FROM 1_links')
+        limits = limits[0]
+        first = datetime.datetime.fromtimestamp(limits.first)
+        last = datetime.datetime.fromtimestamp(limits.last)
+
+        date_range = web.utils.Storage(
+            years=range(first.year, last.year+1),
+            year=None if no_year else year,
+            month=None if no_month else month,
+            months=calendar.month_name,
+            )
+
+        return render_links(
+            where='timestamp >= $tstart and timestamp < $tend', 
+            vars={ 'tstart': tstart, 'tend': tend },
+            span=span,
+            date_range=date_range,
+            )
 
 class link:
     def GET(self, id):
