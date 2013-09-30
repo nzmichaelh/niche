@@ -1,0 +1,32 @@
+$def with (links, base)
+<!--?xml version="1.0"?-->
+<rss version="2.0">
+   <channel>
+      <title>$config.get('site', 'name')</title>
+      <link>$base</link>
+      $ subtitle = config.get('site', 'subtitle')
+      $if subtitle: <description>$subtitle</description>
+      <language>en-us</language>
+      <generator>niche</generator>
+      $ contact = config.get('site', 'contact')
+      $if contact: <managingEditor>$contact</managingEditor>
+      $if contact: <webMaster>$contact</webMaster>
+
+      $for link in links:
+        <item>
+          <title>
+            $if not link.URL: $link.title
+            $else: $link.URL_description
+          </title>
+          <description>
+            $if link.URL:
+              <![CDATA[<a href="$link.URL">$:link.URL_description</a>]]>
+            <![CDATA[$:link.description]]>
+          </description>
+          <author>$link.user.username</author>
+          <pubDate>$model.to_rss_date(link.timestamp)</pubDate>
+          <link>$base/link/$link.linkID</link>
+          <guid>$base/link/$link.linkID</guid>
+        </item>
+    </channel>
+</rss>
