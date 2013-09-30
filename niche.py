@@ -34,10 +34,12 @@ urls = (
     r'/user/([^/]+)', 'user',
     r'/user/([^/]+)/links', 'user_links',
     r'/user/([^/]+)/comments', 'user_comments',
+    r'/user/([^/]+)/checkout', 'checkout',
     r'/user/([^/]+)/password', 'password',
     r'/login', 'login',
     r'/logout', 'logout',
     r'/newuser', 'newuser',
+    r'/rss', 'rss',
 )
 
 # Default configuration
@@ -60,6 +62,7 @@ DEFAULTS = [
     ( 'site', {
             'name': 'Nichefilter',
             'subtitle': 'of no fixed subtitle',
+            'contact': None,
             }),
     ]
 
@@ -83,7 +86,7 @@ def read_config():
 
 config = read_config()
 
-FEATURES = 'likes gravatar'.split()
+FEATURES = 'likes gravatar rss checkout'.split()
 
 def get_features(config):
     features = web.utils.Storage()
@@ -173,6 +176,9 @@ class AutoMapper:
         """Convert a timestamp to a link."""
         date = self.to_date()
         return '%04d/%02d/%02d' % (date.year, date.month, date.day)
+
+def map_all(type, results):
+    return [AutoMapper(type, x) for x in results]
 
 def first_or_none(type, column, id, strict=False):
     """Get the first item in the table that matches or None if there's
@@ -269,18 +275,28 @@ class Model:
         else:
             indexes = []
         return page, sorted(indexes)
-        
+
+    def to_rss_date(self, timestamp):
+        return datetime.datetime.fromtimestamp(timestamp).strftime('%a, %d %b %Y %H:%M:%S +0000')
+
 model = Model()
+
+render_globals = {
+    'model': model,
+    'config': config,
+    'features': features,
+    'version': get_version(),
+}
 
 render = web.template.render(
     'templates/',
     base='layout',
-    globals={
-        'model': model,
-        'config': config,
-        'features': features,
-        'version': get_version(),
-        },
+    globals=render_globals,
+    )
+
+naked_render = web.template.render(
+    'templates/',
+    globals=render_globals,
     )
 
 app = web.application(urls, locals())
@@ -319,6 +335,11 @@ def authenticate(msg=_("Login required")):
 
 def need_admin(msg):
     if not model.is_admin():
+        model.inform(msg)
+        redirect('/login')            
+
+def need_user_or_admin(id, msg):
+    if not model.is_user_or_admin(id):
         model.inform(msg)
         redirect('/login')            
 
@@ -365,7 +386,7 @@ def render_links(where=None, span=None, vars={}, date_range=None):
 
     total = results[0].total
 
-    return render.links([AutoMapper('link', x) for x in links], span, web.ctx.path, offset, limit, total, date_range)
+    return render.links(map_all('link', links), span, web.ctx.path, offset, limit, total, date_range)
 
 class index:
     def GET(self):
@@ -594,6 +615,15 @@ class user_comments:
                              limit=config.get('general', 'limit'))
         return render.user_comments([AutoMapper('comment', x) for x in comments])
 
+class checkout:
+    def GET(self, name):
+        require_feature('checkout')
+        user = model.get_user_by_name(name)
+        need_user_or_admin(user.userID, _('Only the user can checkout their links'))
+
+        web.header('Content-Type', 'application/xml')
+        return naked_render.rss(user.links, web.ctx.home)
+
 class login:
     login = web.form.Form(
         web.form.Textbox('username', web.form.notnull),
@@ -667,6 +697,14 @@ class password:
         
         model.inform(_("Password changed"))
         redirect('/user/%s' % name)
+
+class rss:
+    def GET(self):
+        require_feature('rss')
+        links = db.select('1_links', order='linkID DESC', limit=20)
+        links = map_all('link', links)
+        web.header('Content-Type', 'application/xml')
+        return naked_render.rss(links, web.ctx.home)
 
 if __name__ == "__main__":
     server_type = config.get('general', 'server_type')

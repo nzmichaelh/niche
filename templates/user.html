@@ -17,6 +17,9 @@ $:user.bio
   <a href="user/$user.username/links">$len(user.links) links</a>
   <span class="sep"> | </span>
   <a href="user/$user.username/comments">$len(user.comments) comments</a>
+$if model.is_user_or_admin(user.userID):
+  <span class="sep"> | </span>
+  <a href="user/$user.username/checkout">All links as RSS</a>
 $if features.likes:
   <span class="sep"> | </span>
   <a href="user/$user.username/likes">$len(user.likes) likes</a>
