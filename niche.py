@@ -17,23 +17,27 @@ from passlib.apps import custom_app_context as pwd_context
 import strings
 import utils
 
+# pylint: disable=redefined-builtin
+# pylint: disable=redefined-outer-name
+# pylint: disable=no-init
+
 urls = (
-    '/?', 'index',
-    '/links(/\d+)?(/\d+)?(/\d+)?', 'links',
-    '/link/new', 'new_link',
-    '/link/(\d+)', 'link',
-    '/link/(\d+)/hide', 'hide_link',
-    '/link/(\d+)/close', 'close_link',
-    '/link/(\d+)/new', 'new_comment',
-    '/comment/(\d+)/delete', 'delete_comment',
-    '/comment/(\d+)/like', 'like_comment',
-    '/user/([^/]+)', 'user',
-    '/user/([^/]+)/links', 'user_links',
-    '/user/([^/]+)/comments', 'user_comments',
-    '/user/([^/]+)/password', 'password',
-    '/login', 'login',
-    '/logout', 'logout',
-    '/newuser', 'newuser',
+    r'/?', 'index',
+    r'/links(/\d+)?(/\d+)?(/\d+)?', 'links',
+    r'/link/new', 'new_link',
+    r'/link/(\d+)', 'link',
+    r'/link/(\d+)/hide', 'hide_link',
+    r'/link/(\d+)/close', 'close_link',
+    r'/link/(\d+)/new', 'new_comment',
+    r'/comment/(\d+)/delete', 'delete_comment',
+    r'/comment/(\d+)/like', 'like_comment',
+    r'/user/([^/]+)', 'user',
+    r'/user/([^/]+)/links', 'user_links',
+    r'/user/([^/]+)/comments', 'user_comments',
+    r'/user/([^/]+)/password', 'password',
+    r'/login', 'login',
+    r'/logout', 'logout',
+    r'/newuser', 'newuser',
 )
 
 # Default configuration
@@ -194,6 +198,16 @@ class Model:
         id = session.get('userID', None)
         return id != None and (str(id) in config.getlist('groups', 'admins'))
 
+    def is_user_or_admin(self, user_id):
+        id = session.get('userID', None)
+
+        if id is None:
+            return False
+        elif id == user_id:
+            return True
+        else:
+            return self.is_admin()
+
     def get_link(self, id):
         """Get a link by link ID"""
         return first_or_none('link', 'linkID', id)
@@ -205,6 +219,10 @@ class Model:
     def get_user(self, id):
         """Get a user by user ID"""
         return first_or_none('user', 'userID', id)
+
+    def get_user_by_name(self, name):
+        """Get a user by user name"""
+        return first_or_none('user', 'username', name)
 
     def get_gravatar(self, email):
         """Get the gravatar hash for an email"""
@@ -238,6 +256,7 @@ class Model:
         # TODO(michaelh): really a helper, not part of the model.
         page = 1 + offset // per_page
         pages = total // per_page
+        step = 1
         for step in (1, 2, 5, 10, 20, 50):
             if pages / step <= 6:
                 break
@@ -526,13 +545,12 @@ class new_comment:
         if 'preview' in web.input():
             return render.link(link, form, content)
 
-        next = db.insert('1_comments',
-                         linkID=link.linkID,
-                         userID=user.userID,
-                         timestamp=now(),
-                         content=content
-                         )
-
+        db.insert('1_comments',
+                  linkID=link.linkID,
+                  userID=user.userID,
+                  timestamp=now(),
+                  content=content
+                  )
         model.inform(_("New comment success"))
         redirect('/link/%d' % link.linkID)
 
@@ -548,7 +566,7 @@ class delete_comment:
 
 class like_comment:
     def GET(self, id):
-        check_feature('likes')
+        require_feature('likes')
         authenticate(_("Login to like"))
         comment = model.get_comment(id)
 
@@ -627,28 +645,28 @@ class password:
             ]
         )
 
-    def authenticate(self, id):
+    def authenticate(self, name):
         authenticate()
 
-        active = model.get_active()
-        error(_("Permission denied"), active.username != id, '/user/%s' % id)
+        target = model.get_user_by_name(name)
+        error(_("Permission denied"), not model.is_user_or_admin(target.userID), '/user/%s' % name)
 
-    def GET(self, id):
-        self.authenticate(id)
+    def GET(self, name):
+        self.authenticate(name)
         return render.password(self.form())
 
-    def POST(self, id):
-        self.authenticate(id)
+    def POST(self, name):
+        self.authenticate(name)
 
         form = self.form()
 
         if not form.validates():
             return render.login(form)
 
-        db.update('1_users', password=pwd_context.encrypt(form.d.password), where='username=$id', vars={'id': id})
+        db.update('1_users', password=pwd_context.encrypt(form.d.password), where='username=$name', vars={'name': name})
         
         model.inform(_("Password changed"))
-        redirect('/user/%s' % id)
+        redirect('/user/%s' % name)
 
 if __name__ == "__main__":
     server_type = config.get('general', 'server_type')
