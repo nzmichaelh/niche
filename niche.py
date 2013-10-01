@@ -9,6 +9,8 @@ import re
 import time
 import subprocess
 import calendar
+import gc
+import collections
 
 import web
 import bleach
@@ -40,6 +42,7 @@ urls = (
     r'/logout', 'logout',
     r'/newuser', 'newuser',
     r'/rss', 'rss',
+    r'/internal/gc', 'internal_gc',
 )
 
 ALLOWED_TAGS = """
@@ -720,6 +723,29 @@ class rss:
         links = map_all('link', links)
         web.header('Content-Type', 'application/xml')
         return naked_render.rss(links, web.ctx.home)
+
+_last = None
+
+class internal_gc:
+    def GET(self):
+        need_admin('Only admins can access server status pages.')
+        gc.collect()
+        gc.collect()
+        now = collections.defaultdict(int)
+        for i in gc.get_objects():
+            now[type(i)] += 1
+
+        global _last
+        last = _last
+        _last = now
+
+        if last is None:
+            return naked_render.internal_gc('Initialised', [])
+        else:
+            diff = [(x, now[x] - last[x]) for x in now]
+            diff = [x for x in diff if x[-1] > 0]
+            diff.sort(key=lambda x: x[-1])
+            return naked_render.internal_gc('Differences', diff)
 
 if __name__ == "__main__":
     server_type = config.get('general', 'server_type')
