@@ -42,13 +42,27 @@ urls = (
     r'/rss', 'rss',
 )
 
+ALLOWED_TAGS = """
+a abbr acronym b blockquote br
+code em i ol ul li p
+pre quote small strike strong
+u img
+""".replace('\n', ' ').strip().split()
+
+ALLOWED_ATTRIBUTES = {
+    'a': ['href', 'title'],
+    'abbr': ['title'],
+    'acronym': ['title'],
+    'img': ['src', 'alt'],
+}
+
 # Default configuration
 DEFAULTS = [
     ( 'general', {
             'dateformat': '%B %d, %Y',
             'base': '/',
             'server_type': 'dev',
-            'extra_tags': 'p pre',
+            'extra_tags': '',
             'limit': 50,
             }),
     ( 'groups', {
@@ -351,14 +365,15 @@ def error(message, condition, target='/'):
 
 def render_input(v, use_markdown=False):
     """Tidy up user input and insert breaks for empty lines."""
-    tags = bleach.ALLOWED_TAGS + config.getlist('general', 'extra_tags')
+    tags = ALLOWED_TAGS + config.getlist('general', 'extra_tags')
+    attrs = ALLOWED_ATTRIBUTES
 
     if use_markdown:
         return bleach.clean(
             markdown.markdown(v, output_format='html5'),
-            tags=tags)
+            tags=tags, attributes=attrs)
     else:
-        v = bleach.clean(v, tags=tags)
+        v = bleach.clean(v, tags=tags, attributes=attrs)
         out = ''
 
         for line in v.split('\n'):
