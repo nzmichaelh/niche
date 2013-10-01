@@ -67,6 +67,7 @@ DEFAULTS = [
             'server_type': 'dev',
             'extra_tags': '',
             'limit': 50,
+            'autoreload': True,
             }),
     ( 'groups', {
             'admins': '',
@@ -316,7 +317,8 @@ naked_render = web.template.render(
     globals=render_globals,
     )
 
-app = web.application(urls, locals())
+app = web.application(urls, locals(),
+                      autoreload=config.get('general', 'autoreload'))
 
 def make_session():
     """Helper that makes the session object, even if in debug mode."""
