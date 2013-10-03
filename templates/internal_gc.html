@@ -3,6 +3,6 @@ $def with (title, diffs)
 <h1>$title</h1>
 <table border=1>
 <tr><th>Type</th><th>Count</th></tr>
-$for type, count in diffs:
-  <tr><td>$type</td><td>$count</td></tr>
+$for type, klass, count in diffs:
+  <tr><td>$type</td><td>$klass</td><td>$count</td></tr>
 </table>

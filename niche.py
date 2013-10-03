@@ -11,6 +11,7 @@ import subprocess
 import calendar
 import gc
 import collections
+import threading
 
 import web
 import bleach
@@ -22,6 +23,27 @@ import utils
 # pylint: disable=redefined-builtin
 # pylint: disable=redefined-outer-name
 # pylint: disable=no-init
+
+_lock = threading.Lock()
+_calls = collections.defaultdict(int)
+_classes = {}
+
+def log_calls(function):
+    def wrapper(*args, **kwargs):
+        with _lock:
+            _calls[function] += 1
+        return function(*args, **kwargs)
+
+    return wrapper
+
+def log_instance_calls(function):
+    def wrapper(self, *args, **kwargs):
+        with _lock:
+            _calls[function] += 1
+            _classes[function] = self.__class__
+        return function(self, *args, **kwargs)
+
+    return wrapper
 
 urls = (
     r'/?', 'index',
@@ -43,6 +65,7 @@ urls = (
     r'/newuser', 'newuser',
     r'/rss', 'rss',
     r'/internal/gc', 'internal_gc',
+    r'/internal/calls', 'internal_calls',
 )
 
 ALLOWED_TAGS = """
@@ -95,6 +118,7 @@ class Config(ConfigParser.RawConfigParser):
     def getlist(self, section, option):
         return self.get(section, option).split()
 
+@log_calls
 def read_config():
     """Set up the defaults and read in niche.ini, if any."""
     cfg = Config()
@@ -106,6 +130,7 @@ config = read_config()
 
 FEATURES = 'likes gravatar rss checkout'.split()
 
+@log_calls
 def get_features(config):
     features = web.utils.Storage()
 
@@ -116,6 +141,7 @@ def get_features(config):
 
 features = get_features(config)
 
+@log_calls
 def get_version():
     return subprocess.check_output('git describe --always --dirty --long'.split()).strip()
 
@@ -146,6 +172,7 @@ fallbacks = {
 }
 
 class AutoMapper:
+    @log_instance_calls
     def __init__(self, type, around):
         self._type = type
         self._around = around
@@ -409,10 +436,12 @@ def render_links(where=None, span=None, vars={}, date_range=None):
     return render.links(map_all('link', links), span, web.ctx.path, offset, limit, total, date_range)
 
 class index:
+    @log_instance_calls
     def GET(self):
         return render_links()
 
 class links:
+    @log_instance_calls
     def GET(self, year, month, day):
         def tidy(v, low, high):
             """Turn an optional parameter into a validated number"""
@@ -474,6 +503,7 @@ class links:
             )
 
 class link:
+    @log_instance_calls
     def GET(self, id):
         link = model.get_link(id)
         form = new_comment.form()
@@ -496,10 +526,12 @@ class new_link:
     def authenticate(self):
         authenticate(_("Login to post"))
 
+    @log_instance_calls
     def GET(self):
         self.authenticate()
         return render.new_link(self.form(), None)
 
+    @log_instance_calls
     def POST(self):
         self.authenticate()
 
@@ -538,6 +570,7 @@ class new_link:
         redirect('/link/%d' % next)
 
 class hide_link:
+    @log_instance_calls
     def GET(self, id):
         link = model.get_link(id)
         need_admin(_('Admin needed to hide a link'))
@@ -549,6 +582,7 @@ class hide_link:
         redirect('/link/%s' % id)
 
 class close_link:
+    @log_instance_calls
     def GET(self, id):
         link = model.get_link(id)
 
@@ -573,6 +607,7 @@ class new_comment:
 
         return link
 
+    @log_instance_calls
     def POST(self, id):
         link = self.check(id)
         form = self.form()
@@ -596,6 +631,7 @@ class new_comment:
         redirect('/link/%d' % link.linkID)
 
 class delete_comment:
+    @log_instance_calls
     def GET(self, id):
         comment = model.get_comment(id)
 
@@ -606,6 +642,7 @@ class delete_comment:
         redirect('/link/%s' % comment.linkID)
 
 class like_comment:
+    @log_instance_calls
     def GET(self, id):
         require_feature('likes')
         authenticate(_("Login to like"))
@@ -618,16 +655,19 @@ class like_comment:
         redirect('/link/%s' % comment.linkID)
 
 class user:
+    @log_instance_calls
     def GET(self, id):
         user = first('user', 'username', id)
         return render.user(user)
 
 class user_links:
+    @log_instance_calls
     def GET(self, id):
         user = first('user', 'username', id)
         return render_links(where='userID=$id', vars={'id': user.userID})
 
 class user_comments:
+    @log_instance_calls
     def GET(self, id):
         user = first('user', 'username', id)
         comments = db.select('1_comments', where='userID=$id', order='timestamp DESC',
@@ -636,6 +676,7 @@ class user_comments:
         return render.user_comments([AutoMapper('comment', x) for x in comments])
 
 class checkout:
+    @log_instance_calls
     def GET(self, name):
         require_feature('checkout')
         user = model.get_user_by_name(name)
@@ -650,9 +691,11 @@ class login:
         web.form.Password('password', web.form.notnull),
         )
 
+    @log_instance_calls
     def GET(self):
         return render.login(self.login())
 
+    @log_instance_calls
     def POST(self):
         form = self.login()
 
@@ -679,6 +722,7 @@ class login:
         redirect('/')
 
 class logout:
+    @log_instance_calls
     def GET(self):
         session.userID = None
 
@@ -701,10 +745,12 @@ class password:
         target = model.get_user_by_name(name)
         error(_("Permission denied"), not model.is_user_or_admin(target.userID), '/user/%s' % name)
 
+    @log_instance_calls
     def GET(self, name):
         self.authenticate(name)
         return render.password(self.form())
 
+    @log_instance_calls
     def POST(self, name):
         self.authenticate(name)
 
@@ -719,6 +765,7 @@ class password:
         redirect('/user/%s' % name)
 
 class rss:
+    @log_instance_calls
     def GET(self):
         require_feature('rss')
         links = db.select('1_links', order='linkID DESC', limit=20)
@@ -729,6 +776,7 @@ class rss:
 _last = None
 
 class internal_gc:
+    @log_instance_calls
     def GET(self):
         need_admin('Only admins can access server status pages.')
         gc.collect()
@@ -749,7 +797,26 @@ class internal_gc:
             diff.sort(key=lambda x: x[-1])
             return naked_render.internal_gc('Differences', diff)
 
-if __name__ == "__main__":
+class internal_calls:
+    @log_instance_calls
+    def GET(self):
+        global _lock
+        with _lock:
+            calls = dict(_calls)
+            klass = dict(_classes)
+
+        def to_name(fun):
+            if fun in klass:
+                return '%s::%s' % (klass[fun].__name__, fun.__name__)
+            else:
+                return fun.__name__
+
+        flat = [(to_name(x), y) for x, y in calls.items()]
+        flat.sort(key=lambda x: x[0])
+        return naked_render.internal_calls(flat)
+
+@log_calls
+def main():
     server_type = config.get('general', 'server_type')
 
     if server_type == 'fastcgi':
@@ -762,3 +829,6 @@ if __name__ == "__main__":
         raise ValueError('Unhandled server_type "%s"' % server_type)
 
     app.run()
+
+if __name__ == "__main__":
+    main()
