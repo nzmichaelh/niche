@@ -64,10 +64,9 @@ DEFAULTS = [
     ( 'general', {
             'dateformat': '%B %d, %Y',
             'base': '/',
-            'server_type': 'dev',
             'extra_tags': '',
             'limit': 50,
-            'autoreload': True,
+            'server_type': 'dev',
             }),
     ( 'groups', {
             'admins': '',
@@ -317,8 +316,7 @@ naked_render = web.template.render(
     globals=render_globals,
     )
 
-app = web.application(urls, locals(),
-                      autoreload=config.get('general', 'autoreload'))
+app = web.application(urls, locals())
 
 def make_session():
     """Helper that makes the session object, even if in debug mode."""
@@ -749,11 +747,10 @@ class internal_gc:
             diff.sort(key=lambda x: x[-1])
             return naked_render.internal_gc('Differences', diff)
 
-if __name__ == "__main__":
+def main():
     server_type = config.get('general', 'server_type')
 
     if server_type == 'fastcgi':
-        web.config.debug = False
         web.wsgi.runwsgi = lambda func, addr=None: web.wsgi.runfcgi(func, addr)
     elif server_type == 'dev':
         # Development machine.  Run stand alone
@@ -762,3 +759,6 @@ if __name__ == "__main__":
         raise ValueError('Unhandled server_type "%s"' % server_type)
 
     app.run()
+
+if __name__ == "__main__":
+    main()
