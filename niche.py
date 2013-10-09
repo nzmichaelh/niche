@@ -11,6 +11,7 @@ import subprocess
 import calendar
 import gc
 import collections
+import json
 
 import web
 import bleach
@@ -38,6 +39,7 @@ urls = (
     r'/user/([^/]+)/comments', 'user_comments',
     r'/user/([^/]+)/checkout', 'checkout',
     r'/user/([^/]+)/password', 'password',
+    r'/user/([^/]+)/edit', 'user_edit',
     r'/login', 'login',
     r'/logout', 'logout',
     r'/newuser', 'newuser',
@@ -67,6 +69,7 @@ DEFAULTS = [
             'extra_tags': '',
             'limit': 50,
             'server_type': 'dev',
+            'user_fields': 'realname email homepage gravatar_email team location twitter facebook google_plus_ skype aim',
             }),
     ( 'groups', {
             'admins': '',
@@ -144,6 +147,27 @@ fallbacks = {
     'user': web.utils.Storage(username='anonymous'),
 }
 
+class JSONMapper:
+    def __init__(self, around, name):
+        self._around = around
+        self._name = name
+
+        raw = getattr(around, name)
+        raw = json.loads(raw) if raw else {}
+        self._values = web.storage(raw)
+
+    def __getattr__(self, key):
+        return getattr(self._values, key, None)
+
+    def get(self, key):
+        return getattr(self._values, key, None)
+
+    def set(self, key, value):
+        if value != getattr(self, key):
+            self._values[key] = value
+            encoded = json.dumps(self._values)
+            db.update('1_users', where='userID = $id', contacts=encoded, vars={'id': self._around.userID})
+
 class AutoMapper:
     def __init__(self, type, around):
         self._type = type
@@ -167,6 +191,12 @@ class AutoMapper:
 
             raise web.notfound()
 
+        if name.endswith('_json'):
+            field = name[:-5]
+            mapper = JSONMapper(self, field)
+            setattr(self, name, mapper)
+            return mapper
+
         if name.endswith('s'):
             singular = name[:-1]
             table = '1_%s' % name
@@ -177,6 +207,12 @@ class AutoMapper:
             return [AutoMapper(singular, x) for x in rows]
 
         raise AttributeError(name)
+
+    def get(self, key):
+        return getattr(self, key, None)
+
+    def has(self, key):
+        return key in self._around
 
     def ago(self):
         return utils.ago(self.timestamp)
@@ -214,6 +250,9 @@ def first_or_none(type, column, id, strict=False):
 def first(type, column, id):
     """Get the first matching item in the table or raise not found."""
     return first_or_none(type, column, id, strict=True)
+
+def linkify(text):
+    return bleach.clean(bleach.linkify(text, parse_email=True))
 
 class Model:
     """Top level helpers.  Exposed to scripts."""
@@ -296,6 +335,10 @@ class Model:
     def to_rss_date(self, timestamp):
         return datetime.datetime.fromtimestamp(timestamp).strftime('%a, %d %b %Y %H:%M:%S +0000')
 
+    def field_text(self, name):
+        return get_string('field_%s' % name)
+
+
 model = Model()
 
 render_globals = {
@@ -303,6 +346,8 @@ render_globals = {
     'config': config,
     'features': features,
     'version': get_version(),
+    'linkify': linkify,
+    'render_input': render_input,
 }
 
 render = web.template.render(
@@ -446,7 +491,6 @@ class links:
                 end = datetime.date(year, month + 1, day)
         else:
             end = start + datetime.timedelta(days=1)
-        print start, end, span
 
         tstart = time.mktime(start.timetuple())
         tend = time.mktime(end.timetuple())
@@ -697,7 +741,7 @@ class password:
         authenticate()
 
         target = model.get_user_by_name(name)
-        error(_("Permission denied"), not model.is_user_or_admin(target.userID), '/user/%s' % name)
+        need_user_or_admin(target.userID, _('Permission denied'))
 
     def GET(self, name):
         self.authenticate(name)
@@ -715,6 +759,51 @@ class password:
         
         model.inform(_("Password changed"))
         redirect('/user/%s' % name)
+
+class user_edit:
+    def make_form(self, user):
+        names = config.getlist('general', 'user_fields')
+        values = user.contacts_json
+
+        def get(name):
+            value = values.get(name)
+            return value if value else user.get(name)
+
+        fields = [web.form.Textbox(x, value=get(x), description=get_string('field_%s' % x)) for x in names]
+        fields.append(web.form.Textarea('bio', rows=10, cols=80, description=get_string('field_bio'), value=get('bio')))
+        return web.form.Form(*fields)
+
+    def get_target(self, name):
+        authenticate()
+        target = model.get_user_by_name(name)
+        need_user_or_admin(target.userID, _('Permission denied'))
+        return target
+
+    def GET(self, name):
+        target = self.get_target(name)
+        form = self.make_form(target)
+        return render.user_edit(target, form)
+
+    def POST(self, username):
+        target = self.get_target(username)
+        form = self.make_form(target)
+
+        if not form.validates():
+            return render.user_edit(target, form)
+
+        names = config.getlist('general', 'user_fields')
+        values = target.contacts_json
+
+        for name in names:
+            if target.has(name):
+                db.update('1_users', where='userID = $id', vars={'id': target.userID}, **{name: form[name].value})
+            else:
+                values.set(name, form[name].value)
+
+        bio = render_input(form.d.bio)
+        db.update('1_users', bio=bio, where='userID = $id', vars={'id': target.userID})
+        redirect('/user/%s' % username)
+
 
 class rss:
     def GET(self):

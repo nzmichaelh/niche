@@ -1,18 +1,27 @@
 $def with (user)
 
-<h2>$user.username's profile</h2>
-
-<p>
-$if features.gravatar:
-  <img src="http://www.gravatar.com/avatar/$model.get_gravatar(user.email)"/>
-Name: $user.realname
-<p>User ID: $user.userID
+$ fields = user.contacts_json
+<h2>
+$if fields.gravatar_email:
+  <img src="http://www.gravatar.com/avatar/$model.get_gravatar(fields.gravatar_email)"/>
+$user.username (user #$user.userID)</h2>
+$if model.get_active():
+    <ul>
+    $for field in config.getlist('general', 'user_fields'):
+        $ value = fields.get(field)
+        $ value = value if value else user.get(field)
+        $if value:
+            <li>$model.field_text(field): $:linkify(value)
+    </ul>
 $if model.is_user_or_admin(user.userID):
+    <a href="user/$user.username/edit">Edit</a>
+    <span class="sep"> | </span>
     <a href="user/$user.username/password">Set password</a>
-<p>Homepage: <a href="$user.homepage">$user.homepage</a>
-<p>Bio:
-$:user.bio
-
+$else:
+    <a href="login">Log in</a> for details.
+<p><hr/>
+$:render_input(user.bio)
+<p><hr/>
 <p>
   <a href="user/$user.username/links">$len(user.links) links</a>
   <span class="sep"> | </span>

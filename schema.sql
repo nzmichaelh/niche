@@ -144,6 +144,7 @@ CREATE TABLE `1_users` (
   `bio` mediumtext NOT NULL,
   `preferences` text,
   `last_visit` int(14) unsigned NOT NULL default '0',
+  `contacts` text,
   PRIMARY KEY  (`userID`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

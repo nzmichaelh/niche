@@ -1,0 +1,9 @@
+$def with (user, form)
+
+<h2>Editing $user.username</h2>
+
+<form name="main" method="post">
+  $:form.render()
+  <input type="submit" name="post" value="Update"/>
+</form>
+<p>Your bio is shown to all visitors.  Other details are only shown to logged in users.
