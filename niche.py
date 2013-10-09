@@ -254,6 +254,27 @@ def first(type, column, id):
 def linkify(text):
     return bleach.clean(bleach.linkify(text, parse_email=True))
 
+def render_input(v, use_markdown=False):
+    """Tidy up user input and insert breaks for empty lines."""
+    tags = ALLOWED_TAGS + config.getlist('general', 'extra_tags')
+    attrs = ALLOWED_ATTRIBUTES
+
+    if use_markdown:
+        return bleach.clean(
+            markdown.markdown(v, output_format='html5'),
+            tags=tags, attributes=attrs)
+    else:
+        v = bleach.clean(v, tags=tags, attributes=attrs)
+        out = ''
+
+        for line in v.split('\n'):
+            if not line.strip():
+                out += '<br/>\n'
+            else:
+                out += line + '\n'
+
+        return out
+
 class Model:
     """Top level helpers.  Exposed to scripts."""
     def is_admin(self):
@@ -410,27 +431,6 @@ def error(message, condition, target='/'):
     if condition:
         model.inform(message)
         redirect(target)
-
-def render_input(v, use_markdown=False):
-    """Tidy up user input and insert breaks for empty lines."""
-    tags = ALLOWED_TAGS + config.getlist('general', 'extra_tags')
-    attrs = ALLOWED_ATTRIBUTES
-
-    if use_markdown:
-        return bleach.clean(
-            markdown.markdown(v, output_format='html5'),
-            tags=tags, attributes=attrs)
-    else:
-        v = bleach.clean(v, tags=tags, attributes=attrs)
-        out = ''
-
-        for line in v.split('\n'):
-            if not line.strip():
-                out += '<br/>\n'
-            else:
-                out += line + '\n'
-
-        return out
 
 def render_links(where=None, span=None, vars={}, date_range=None):
     input = web.input()
