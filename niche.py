@@ -391,7 +391,7 @@ def tidy_form(form):
     for input in form.inputs:
         input.description = get_string('field_%s' % input.name)
 
-        if isinstance(input, web.form.Textbox):
+        if isinstance(input, web.form.Textbox) or isinstance(input, web.form.Password):
             input.attrs['size'] = TEXT_SIZE
             input.attrs['maxlength'] = TEXT_MAX_LENGTH
     return form

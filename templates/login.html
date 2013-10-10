@@ -6,3 +6,10 @@ $:form.render_css()
     <input type="submit"/>
 </form>
 </div>
+$ contact = config.get('site', 'contact')
+$if contact:
+   Forgotten your password?
+   <a href="mailto:$contact?subject=$config.get('site', 'name')%20password%20reset">
+     Send us an email.
+   </a>
+   <p/>
