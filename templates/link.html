@@ -58,12 +58,8 @@ $if not link.closed:
   $if preview:
     <div class="preview">$:preview</div><p>
   <div id="commentform">
-    <form name="main" method="post" action="$here/new"> 
-      <label for="content">New comment</label>
-      $if form.content.note: <p class="error">$form.content.note</p>
-      <textarea rows="6" cols="80" name="content" id="content"></textarea>
-      <br/>
-      <input type="checkbox" id="use_markdown_use_markdown" value="use_markdown" name="use_markdown"/>&nbsp;<label for="use_markdown_use_markdown">Use Markdown</label>
+    <form name="main" method="post" action="$here/new">
+      $:form.render_css()
       <br/>
       <input type="submit" name="post" value="Post"/>
       <input type="submit" name="preview" value="Preview"/>

@@ -384,6 +384,18 @@ naked_render = web.template.render(
 
 app = web.application(urls, locals())
 
+TEXT_SIZE = 80
+TEXT_MAX_LENGTH = 150
+
+def tidy_form(form):
+    for input in form.inputs:
+        input.description = get_string('field_%s' % input.name)
+
+        if isinstance(input, web.form.Textbox):
+            input.attrs['size'] = TEXT_SIZE
+            input.attrs['maxlength'] = TEXT_MAX_LENGTH
+    return form
+
 def make_session():
     """Helper that makes the session object, even if in debug mode."""
     if web.config.get('_session') is None:
@@ -425,6 +437,16 @@ def need_user_or_admin(id, msg):
     if not model.is_user_or_admin(id):
         model.inform(msg)
         redirect('/login')            
+
+def check_password(got, user):
+    if user is None:
+        return False
+
+    try:
+        return passlib.hash.mysql323.verify(got, user.password)
+    except ValueError:
+        return pwd_context.verify(got, user.password)
+
 
 def error(message, condition, target='/'):
     """Log an error if condition is true and bounce to somewhere."""
@@ -526,14 +548,15 @@ class new_link:
         web.form.Textbox('title', web.form.notnull),
         web.form.Textbox('url', web.form.Validator(_("Not a URL"), url_validator)),
         web.form.Textbox('url_description'),
-        web.form.Textarea('description', rows=10, cols=80),
-        web.form.Textarea('extended', rows=10, cols=80),
+        web.form.Textarea('description', rows=5, cols=80),
+        web.form.Textarea('extended', rows=5, cols=80),
         web.form.Checkbox('use_markdown', value='use_markdown'),
         validators = [
             web.form.Validator(_("URLs need a description"), lambda x: x.url_description if x.url else True),
             web.form.Validator(_("Need a URL or description"), lambda x: x.url or x.description),
             ]
         )
+    form = tidy_form(form)
 
     def authenticate(self):
         authenticate(_("Login to post"))
@@ -603,9 +626,10 @@ class close_link:
 
 class new_comment:
     form = web.form.Form(
-        web.form.Textarea('content', web.form.notnull, rows=10, cols=80),
+        web.form.Textarea('comment', web.form.notnull, rows=5, cols=80),
         web.form.Checkbox('use_markdown', value='use_markdown'),
         )
+    form = tidy_form(form)
 
     def check(self, id):
         authenticate(_("Login to comment"))
@@ -623,16 +647,16 @@ class new_comment:
             return render.link(link, form, None)
 
         user = model.get_active()
-        content = render_input(form.d.content, form.d.use_markdown)
+        comment = render_input(form.d.comment, form.d.use_markdown)
 
         if 'preview' in web.input():
-            return render.link(link, form, content)
+            return render.link(link, form, comment)
 
         db.insert('1_comments',
                   linkID=link.linkID,
                   userID=user.userID,
                   timestamp=now(),
-                  content=content
+                  content=comment
                   )
         model.inform(_("New comment success"))
         redirect('/link/%d' % link.linkID)
@@ -691,6 +715,7 @@ class login:
         web.form.Textbox('username', web.form.notnull),
         web.form.Password('password', web.form.notnull),
         )
+    login = tidy_form(login)
 
     def GET(self):
         return render.login(self.login())
@@ -702,15 +727,8 @@ class login:
             return render.login(form)
 
         user = first_or_none('user', 'username', form.d.username)
-        ok = False
 
-        if user:
-            try:
-                ok = passlib.hash.mysql323.verify(form.d.password, user.password)
-            except ValueError:
-                ok = pwd_context.verify(form.d.password, user.password)
-
-        if not ok:
+        if not check_password(form.d.password, user):
             form.valid = False
             model.inform(_("Bad username or password"))
             return render.login(form)
@@ -729,33 +747,39 @@ class logout:
 
 class password:
     form = web.form.Form(
-        web.form.Password('password', web.form.notnull, password_validator,
-                          description=_("New password")),
-        web.form.Password('again', web.form.notnull, description=_("Password again")),
+        web.form.Password('password', web.form.notnull),
+        web.form.Password('new_password', web.form.notnull, password_validator),
+        web.form.Password('again', web.form.notnull),
         validators=[
-            web.form.Validator(_("Passwords don't match"), lambda x: x.password == x.again)
+            web.form.Validator(_("Passwords don't match"), lambda x: x.new_password == x.again)
             ]
         )
+    form = tidy_form(form)
 
     def authenticate(self, name):
         authenticate()
 
         target = model.get_user_by_name(name)
         need_user_or_admin(target.userID, _('Permission denied'))
+        return target
 
     def GET(self, name):
         self.authenticate(name)
         return render.password(self.form())
 
     def POST(self, name):
-        self.authenticate(name)
-
+        target = self.authenticate(name)
         form = self.form()
 
         if not form.validates():
-            return render.login(form)
+            return render.password(form)
 
-        db.update('1_users', password=pwd_context.encrypt(form.d.password), where='username=$name', vars={'name': name})
+        if not model.is_admin():
+            if not check_password(form.d.password, target):
+                form.note = _('Bad password')
+                return render.password(form)
+
+        db.update('1_users', password=pwd_context.encrypt(form.d.new_password), where='userID=$id', vars={'id': target.userID})
         
         model.inform(_("Password changed"))
         redirect('/user/%s' % name)
@@ -769,9 +793,9 @@ class user_edit:
             value = values.get(name)
             return value if value else user.get(name)
 
-        fields = [web.form.Textbox(x, value=get(x), description=get_string('field_%s' % x)) for x in names]
-        fields.append(web.form.Textarea('bio', rows=10, cols=80, description=get_string('field_bio'), value=get('bio')))
-        return web.form.Form(*fields)
+        fields = [web.form.Textbox(x, value=get(x), size=60) for x in names]
+        fields.append(web.form.Textarea('bio', rows=5, cols=80, value=get('bio')))
+        return tidy_form(web.form.Form(*fields))
 
     def get_target(self, name):
         authenticate()

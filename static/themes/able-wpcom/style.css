@@ -1276,6 +1276,9 @@ article.comment {
 #commentform input[ type="text" ] {
 	display: block;
 }
+#commentform input[ type="password" ] {
+	display: block;
+}
 #commentform .required {
 	color: rgb( 255, 0, 0 ); /* #ff0000 */
 }

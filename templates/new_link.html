@@ -13,8 +13,12 @@ $if preview != None:
     </div>
 <p>
 
+<div id="commentform">
 <form name="main" method="post"> 
-$:form.render()
+$:form.render_css()
+<br/>
 <input type="submit" name="post" value="Post"/>
 <input type="submit" name="preview" value="Preview"/>
 </form>
+</div>
+
