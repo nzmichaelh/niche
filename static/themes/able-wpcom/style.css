@@ -1279,6 +1279,10 @@ article.comment {
 #commentform input[ type="password" ] {
 	display: block;
 }
+#commentform input[ type="checkbox" ] {
+    margin-left: 0.5em;
+}
+
 #commentform .required {
 	color: rgb( 255, 0, 0 ); /* #ff0000 */
 }
