@@ -367,6 +367,12 @@ class Model:
     def field_text(self, name):
         return get_string('field_%s' % name)
 
+    def plural(self, value, name):
+        # I appoligise in advance.
+        if value == 1:
+            return '%s %s' % (value, name)
+        else:
+            return '%d %ss' % (value, name)
 
 model = Model()
 

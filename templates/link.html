@@ -43,7 +43,7 @@ $for comment in comments:
     $if features.likes:
         $ likes = comment.likes
         <span class="sep"> | </span>
-        $len(likes) likes
+        $model.plural(len(likes), 'like')
         <span class="sep"> | </span>
         <a href="comment/$comment.commentID/like">I like it</a>
     $if model.is_admin():
