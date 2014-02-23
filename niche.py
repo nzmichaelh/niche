@@ -377,7 +377,7 @@ class Model:
 
     def get_new(self):
         # Go back two days.
-        since = now() - 60*60*24*90
+        since = now() - 60*60*24*3
         comments = db.select('1_comments', where='timestamp >= $since', vars={'since': since}, order='timestamp ASC')
         # Pull out the unique links.
         ids = {}
