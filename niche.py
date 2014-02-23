@@ -89,6 +89,7 @@ DEFAULTS = [
             'name': 'Nichefilter',
             'subtitle': 'of no fixed subtitle',
             'contact': None,
+            'license': None,
             }),
     ]
 
