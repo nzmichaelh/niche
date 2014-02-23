@@ -45,6 +45,12 @@ urls = (
     r'/newuser', 'newuser',
     r'/rss', 'rss',
     r'/debug/counters', 'debug_counters',
+
+    # MonkeyFilter compatible URLs.
+    r'/link\.php/(\d+)', 'link',
+    r'/user\.php/([^/]+)', 'user',
+    r'/rss.php', 'rss',
+    r'/rss.xml', 'rss',
 )
 
 ALLOWED_TAGS = """
