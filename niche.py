@@ -375,6 +375,18 @@ class Model:
         else:
             return '%d %ss' % (value, name)
 
+    def get_new(self):
+        # Go back two days.
+        since = now() - 60*60*24*90
+        comments = db.select('1_comments', where='timestamp >= $since', vars={'since': since}, order='timestamp ASC')
+        # Pull out the unique links.
+        ids = {}
+        for comment in comments:
+            if comment.linkID not in ids:
+                ids[comment.linkID] = comment
+        comments = sorted(ids.values(), key=lambda x: x.linkID)
+        return [AutoMapper('comment', x) for x in comments]
+
 model = Model()
 
 render_globals = {

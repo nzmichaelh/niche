@@ -46,6 +46,20 @@ $ active = model.get_active()
               $:content
             </div>
           </div>
+          <div id="secondary">
+            $if active:
+              $ new = model.get_new()
+              $if new:
+                <p class="new">New comments on
+                $for comment in new:
+                  $ link = comment.link
+                  <a href="link/$link.linkID#comment_$comment.commentID">
+                    $if not link.URL: $link.title
+                    $else: $link.URL_description
+                  </a>
+                  $if not loop.last: ..
+                </p>
+          </div>
         </div>
           <hr/>
 	<footer id="colophon" class="site-footer" role="contentinfo">

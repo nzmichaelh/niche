@@ -34,7 +34,7 @@ $ comments = link.comments
 <ul class="commentlist">
 $for comment in comments:
     <li>
-    <div class="comment">
+    <div class="comment" id="comment_$comment.commentID">
     $:comment.content
     <footer>
     $ user = comment.user
