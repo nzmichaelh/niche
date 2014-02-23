@@ -44,7 +44,7 @@ urls = (
     r'/logout', 'logout',
     r'/newuser', 'newuser',
     r'/rss', 'rss',
-    r'/internal/gc', 'internal_gc',
+    r'/debug/counters', 'debug_counters',
 )
 
 ALLOWED_TAGS = """
@@ -85,6 +85,8 @@ DEFAULTS = [
             'contact': None,
             }),
     ]
+
+counters = utils.Counters()
 
 class Config(ConfigParser.RawConfigParser):
     def set_defaults(self, defaults):
@@ -451,6 +453,7 @@ def check_password(got, user):
 def error(message, condition, target='/'):
     """Log an error if condition is true and bounce to somewhere."""
     if condition:
+        counters.bump('error')
         model.inform(message)
         redirect(target)
 
@@ -475,10 +478,13 @@ def render_links(where=None, span=None, vars={}, date_range=None):
 
 class index:
     def GET(self):
+        counters.bump(self)
         return render_links()
 
 class links:
     def GET(self, year, month, day):
+        counters.bump(self)
+
         def tidy(v, low, high):
             """Turn an optional parameter into a validated number"""
             if v:
@@ -539,6 +545,7 @@ class links:
 
 class link:
     def GET(self, id):
+        counters.bump(self)
         link = model.get_link(id)
         form = new_comment.form()
         return render.link(link, form, False)
@@ -566,6 +573,7 @@ class new_link:
         return render.new_link(self.form(), None)
 
     def POST(self):
+        counters.bump(self)
         self.authenticate()
 
         form = self.form()
@@ -604,6 +612,7 @@ class new_link:
 
 class hide_link:
     def GET(self, id):
+        counters.bump(self)
         link = model.get_link(id)
         need_admin(_('Admin needed to hide a link'))
 
@@ -615,6 +624,7 @@ class hide_link:
 
 class close_link:
     def GET(self, id):
+        counters.bump(self)
         link = model.get_link(id)
 
         need_admin(_('Admin needed to close a link'))
@@ -640,6 +650,7 @@ class new_comment:
         return link
 
     def POST(self, id):
+        counters.bump(self)
         link = self.check(id)
         form = self.form()
 
@@ -663,6 +674,7 @@ class new_comment:
 
 class delete_comment:
     def GET(self, id):
+        counters.bump(self)
         comment = model.get_comment(id)
 
         need_admin(_('Admin needed to delete a comment'))
@@ -673,6 +685,7 @@ class delete_comment:
 
 class like_comment:
     def GET(self, id):
+        counters.bump(self)
         require_feature('likes')
         authenticate(_("Login to like"))
         comment = model.get_comment(id)
@@ -685,16 +698,19 @@ class like_comment:
 
 class user:
     def GET(self, id):
+        counters.bump(self)
         user = first('user', 'username', id)
         return render.user(user)
 
 class user_links:
     def GET(self, id):
+        counters.bump(self)
         user = first('user', 'username', id)
         return render_links(where='userID=$id', vars={'id': user.userID})
 
 class user_comments:
     def GET(self, id):
+        counters.bump(self)
         user = first('user', 'username', id)
         comments = db.select('1_comments', where='userID=$id', order='timestamp DESC',
                              vars={'id': user.userID},
@@ -703,6 +719,7 @@ class user_comments:
 
 class checkout:
     def GET(self, name):
+        counters.bump(self)
         require_feature('checkout')
         user = model.get_user_by_name(name)
         need_user_or_admin(user.userID, _('Only the user can checkout their links'))
@@ -721,6 +738,7 @@ class login:
         return render.login(self.login())
 
     def POST(self):
+        counters.bump(self)
         form = self.login()
 
         if not form.validates():
@@ -729,6 +747,7 @@ class login:
         user = first_or_none('user', 'username', form.d.username)
 
         if not check_password(form.d.password, user):
+            counters.bump(self, 'fail')
             form.valid = False
             model.inform(_("Bad username or password"))
             return render.login(form)
@@ -736,10 +755,12 @@ class login:
         session.userID = user.userID
 
         model.inform(_("Logged in"))
+        counters.bump(self, 'ok')
         redirect('/')
 
 class logout:
     def GET(self):
+        counters.bump(self)
         session.userID = None
 
         model.inform(_("Logged out"))
@@ -768,6 +789,7 @@ class password:
         return render.password(self.form())
 
     def POST(self, name):
+        counters.bump(self)
         target = self.authenticate(name)
         form = self.form()
 
@@ -776,6 +798,7 @@ class password:
 
         if not model.is_admin():
             if not check_password(form.d.password, target):
+                counters.bump(self, 'bad_password')
                 form.note = _('Bad password')
                 return render.password(form)
 
@@ -809,6 +832,7 @@ class user_edit:
         return render.user_edit(target, form)
 
     def POST(self, username):
+        counters.bump(self)
         target = self.get_target(username)
         form = self.make_form(target)
 
@@ -831,34 +855,21 @@ class user_edit:
 
 class rss:
     def GET(self):
+        counters.bump(self)
         require_feature('rss')
         links = db.select('1_links', order='linkID DESC', limit=20)
         links = map_all('link', links)
         web.header('Content-Type', 'application/xml')
         return naked_render.rss(links, web.ctx.home)
 
-_last = None
 
-class internal_gc:
+class debug_counters:
     def GET(self):
+        counters.bump(self)
         need_admin('Only admins can access server status pages.')
-        gc.collect()
-        gc.collect()
-        now = collections.defaultdict(int)
-        for i in gc.get_objects():
-            now[type(i)] += 1
+        web.header('Content-Type', 'application/json')
+        return json.dumps(counters.get_snapshot())
 
-        global _last
-        last = _last
-        _last = now
-
-        if last is None:
-            return naked_render.internal_gc('Initialised', [])
-        else:
-            diff = [(x, now[x] - last[x]) for x in now]
-            diff = [x for x in diff if x[-1] > 0]
-            diff.sort(key=lambda x: x[-1])
-            return naked_render.internal_gc('Differences', diff)
 
 def main():
     server_type = config.get('general', 'server_type')

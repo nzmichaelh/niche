@@ -1,4 +1,30 @@
+import collections
+import copy
 import time
+import threading
+
+
+class Counters(object):
+    def __init__(self):
+        self.counters = collections.defaultdict(int)
+        self.lock = threading.Lock()
+        self.counters['id'] = id(self)
+
+    def bump(self, name, arg=None):
+        if not isinstance(name, str):
+            name = name.__class__.__name__
+            if '.' in name:
+                name = name[name.rindex('.')+1:]
+        if arg:
+            name = '%s/%s' % (name, arg)
+
+        with self.lock:
+            self.counters[name] += 1
+
+    def get_snapshot(self):
+        with self.lock:
+            return copy.copy(self.counters)
+
 
 def now():
     """Return the current time in the right epoch."""
