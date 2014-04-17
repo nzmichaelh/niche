@@ -12,6 +12,7 @@ import calendar
 import gc
 import collections
 import json
+import random
 
 import web
 import bleach
@@ -92,6 +93,7 @@ DEFAULTS = [
             'subtitle': 'of no fixed subtitle',
             'contact': None,
             'license': None,
+            'secret': '',
             }),
     ]
 
@@ -136,7 +138,11 @@ def get_string(id):
     """Get a string gettext style.  Splits the strings from the
     code.
     """
-    id = id.lower().replace(' ', '_').replace("'", "")
+    id = id.lower()
+    id = re.sub(r'[\']', '', id)
+    id = re.sub(r'\W', '_', id)
+    id = re.sub(r'_{2,}', '_', id)
+    id = re.sub(r'_$', '', id)
     return strings.__dict__[id]
 
 _ = get_string
@@ -412,12 +418,48 @@ naked_render = web.template.render(
 
 app = web.application(urls, locals())
 
+def get_csrf():
+    token = session.get('csrf_token', None)
+    if token is None:
+        token = hashlib.md5(''.join((
+                str(random.randrange(0, 2**20)),
+                config.get('site', 'secret'),
+                config.get('db', 'db'),
+                config.get('db', 'user')))
+                            ).hexdigest()
+        session.csrf_token = token
+    return token
+
+def check_csrf(value):
+    expect = session.get('csrf_token', None)
+
+    if value is None or value != expect:
+        model.inform(_('Possible cross site request forgery.  Try again.'))
+        return False
+    else:
+        return True
+
+class CSRFInput(web.form.Hidden):
+    def __init__(self):
+        super(CSRFInput, self).__init__(name='csrf_token')
+
+    def render(self):
+        attrs = self.attrs.copy()
+        attrs['type'] = self.get_type()
+        attrs['value'] = get_csrf()
+        attrs['name'] = self.name
+        return '<input %s/>' % attrs
+
+    def validate(self, value):
+        return check_csrf(value)
+
 TEXT_SIZE = 80
 TEXT_MAX_LENGTH = 150
 
 def tidy_form(form):
     for input in form.inputs:
-        input.description = get_string('field_%s' % input.name)
+        if not isinstance(input, CSRFInput):
+            input.description = get_string('field_%s' % input.name)
 
         if isinstance(input, web.form.Textbox) or isinstance(input, web.form.Password):
             input.attrs['size'] = TEXT_SIZE
@@ -474,7 +516,6 @@ def check_password(got, user):
         return passlib.hash.mysql323.verify(got, user.password)
     except ValueError:
         return pwd_context.verify(got, user.password)
-
 
 def error(message, condition, target='/'):
     """Log an error if condition is true and bounce to somewhere."""
@@ -584,6 +625,7 @@ class new_link:
         web.form.Textarea('description', rows=5, cols=80),
         web.form.Textarea('extended', rows=5, cols=80),
         web.form.Checkbox('use_markdown', value='use_markdown'),
+        CSRFInput(),
         validators = [
             web.form.Validator(_("URLs need a description"), lambda x: x.url_description if x.url else True),
             web.form.Validator(_("Need a URL or description"), lambda x: x.url or x.description),
@@ -664,6 +706,7 @@ class new_comment:
     form = web.form.Form(
         web.form.Textarea('comment', web.form.notnull, rows=5, cols=80),
         web.form.Checkbox('use_markdown', value='use_markdown'),
+        CSRFInput(),
         )
     form = tidy_form(form)
 
@@ -712,6 +755,7 @@ class delete_comment:
 class like_comment:
     def GET(self, id):
         counters.bump(self)
+        # TODO: CSRF.
         require_feature('likes')
         authenticate(_("Login to like"))
         comment = model.get_comment(id)
@@ -757,6 +801,7 @@ class login:
     login = web.form.Form(
         web.form.Textbox('username', web.form.notnull),
         web.form.Password('password', web.form.notnull),
+        CSRFInput(),
         )
     login = tidy_form(login)
 
@@ -797,6 +842,7 @@ class password:
         web.form.Password('password', web.form.notnull),
         web.form.Password('new_password', web.form.notnull, password_validator),
         web.form.Password('again', web.form.notnull),
+        CSRFInput(),
         validators=[
             web.form.Validator(_("Passwords don't match"), lambda x: x.new_password == x.again)
             ]
@@ -844,6 +890,7 @@ class user_edit:
 
         fields = [web.form.Textbox(x, value=get(x), size=60) for x in names]
         fields.append(web.form.Textarea('bio', rows=5, cols=80, value=get('bio')))
+        fields.append(CSRFInput())
         return tidy_form(web.form.Form(*fields))
 
     def get_target(self, name):
