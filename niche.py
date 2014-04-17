@@ -19,6 +19,7 @@ from passlib.apps import custom_app_context as pwd_context
 
 import strings
 import utils
+import version
 
 # pylint: disable=redefined-builtin
 # pylint: disable=redefined-outer-name
@@ -67,7 +68,7 @@ ALLOWED_ATTRIBUTES = {
     'img': ['src', 'alt'],
 }
 
-# Default configuration
+# Default configuration.
 DEFAULTS = [
     ( 'general', {
             'dateformat': '%B %d, %Y',
@@ -76,6 +77,7 @@ DEFAULTS = [
             'limit': 50,
             'server_type': 'dev',
             'user_fields': 'realname email homepage gravatar_email team location twitter facebook google_plus_ skype aim',
+            'history_days': 7,
             }),
     ( 'groups', {
             'admins': '',
@@ -128,7 +130,7 @@ def get_features(config):
 features = get_features(config)
 
 def get_version():
-    return subprocess.check_output('git describe --always --dirty --long'.split()).strip()
+    return version.__version__
 
 def get_string(id):
     """Get a string gettext style.  Splits the strings from the
@@ -376,9 +378,8 @@ class Model:
             return '%d %ss' % (value, name)
 
     def get_new(self):
-        # Go back two days.
-        since = now() - 60*60*24*3
-        comments = db.select('1_comments', where='timestamp >= $since', vars={'since': since}, order='timestamp ASC')
+        since = now() - 60*60*24*config.get('general', 'history_days')
+        comments = db.select('1_comments', where='timestamp >= $since', order='timestamp ASC', limit=50, vars={'since': since}, )
         # Pull out the unique links.
         ids = {}
         for comment in comments:

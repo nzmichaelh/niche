@@ -55,7 +55,7 @@ $ active = model.get_active()
                   $ link = comment.link
                   <a href="link/$link.linkID#comment_$comment.commentID">
                     $if not link.URL: $link.title
-                    $else: $link.URL_description
+                    $else: $:link.URL_description
                   </a>
                   $if not loop.last: ..
                 </p>
