@@ -37,8 +37,9 @@ $for link in links:
         <a href="link/$link.linkID" class="more-link">more inside</a>
     </div>
     <div class="entry-meta">
-      posted by <a href="user/$link.user.username">$link.user.username</a>
-      $link.ago() ago
+      posted $link.ago() ago
+      by <a href="user/$link.user.username">$link.user.username</a>
+      
       -
       <a href="link/$link.linkID">$model.plural(len(link.comments), 'comment')</a>
     </div>

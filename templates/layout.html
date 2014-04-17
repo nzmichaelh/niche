@@ -50,15 +50,17 @@ $ active = model.get_active()
             $if active:
               $ new = model.get_new()
               $if new:
-                <p class="new">New comments on
+                <div class="new">
+                <p>New comments on
+                <ul>
                 $for comment in new:
                   $ link = comment.link
-                  <a href="link/$link.linkID#comment_$comment.commentID">
+                  <li><a href="link/$link.linkID#comment_$comment.commentID">
                     $if not link.URL: $link.title
                     $else: $:link.URL_description
                   </a>
-                  $if not loop.last: ..
-                </p>
+                </ul>
+                </div>
           </div>
         </div>
           <hr/>

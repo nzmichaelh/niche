@@ -385,7 +385,7 @@ class Model:
 
     def get_new(self):
         since = now() - 60*60*24*config.get('general', 'history_days')
-        comments = db.select('1_comments', where='timestamp >= $since', order='timestamp ASC', limit=50, vars={'since': since}, )
+        comments = db.select('1_comments', where='timestamp >= $since AND userID <> $user', order='timestamp ASC', limit=50, vars={'since': since, 'user': session.get('userID', None)})
         # Pull out the unique links.
         ids = {}
         for comment in comments:

@@ -38,8 +38,8 @@ $for comment in comments:
     $:comment.content
     <footer>
     $ user = comment.user
-    posted by <a href="user/$user.username">$user.username</a>
-    $comment.ago() ago
+    posted <a href="$here#comment_$comment.commentID">$comment.ago()</a> ago
+    by <a href="user/$user.username">$user.username</a>
     $if features.likes:
         $ likes = comment.likes
         <span class="sep"> | </span>
