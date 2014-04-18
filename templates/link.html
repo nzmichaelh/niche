@@ -41,9 +41,8 @@ $for comment in comments:
     posted <a href="$here#comment_$comment.commentID">$comment.ago()</a> ago
     by <a href="user/$user.username">$user.username</a>
     $if features.likes:
-        $ likes = comment.likes
         <span class="sep"> | </span>
-        $model.plural(len(likes), 'like')
+        $model.plural(comment.like_count, 'like')
         <span class="sep"> | </span>
         <a href="comment/$comment.commentID/like">I like it</a>
     $if model.is_admin():

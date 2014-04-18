@@ -41,7 +41,7 @@ $for link in links:
       by <a href="user/$link.user.username">$link.user.username</a>
       
       -
-      <a href="link/$link.linkID">$model.plural(len(link.comments), 'comment')</a>
+      <a href="link/$link.linkID">$model.plural(link.comment_count, 'comment')</a>
     </div>
 
 $ at, pages = model.paginate(offset, total, limit)

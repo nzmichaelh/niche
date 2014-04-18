@@ -259,6 +259,12 @@ class AutoMapper:
             setattr(self, name, mapper)
             return mapper
 
+        if name.endswith('_count'):
+            field = name[:-6]
+            query = "SELECT COUNT(*) AS total FROM 1_%ss WHERE %sID = $id" % (field, self._type)
+            results = db.query(query, vars={'id': getattr(self, '%sID' % self._type)})
+            return results[0].total
+
         if name.endswith('s'):
             singular = name[:-1]
             table = '1_%s' % name

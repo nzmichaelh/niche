@@ -23,12 +23,12 @@ $else:
 $:render_input(user.bio)
 <p><hr/>
 <p>
-  <a href="user/$user.username/links">$model.plural(len(user.links), 'link')</a>
+  <a href="user/$user.username/links">$model.plural(user.link_count, 'link')</a>
   <span class="sep"> | </span>
-  <a href="user/$user.username/comments">$model.plural(len(user.comments), 'comment')</a>
+  <a href="user/$user.username/comments">$model.plural(user.comment_count, 'comment')</a>
 $if model.is_user_or_admin(user.userID):
   <span class="sep"> | </span>
   <a href="user/$user.username/checkout">All links as RSS</a>
 $if features.likes:
   <span class="sep"> | </span>
-  <a href="user/$user.username/likes">$model.plural(len(user.likes), 'like')</a>
+  <a href="user/$user.username/likes">$model.plural(user.like_count, 'like')</a>
