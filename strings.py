@@ -28,6 +28,7 @@ admin_needed_to_close_a_link = 'Admin needed to close a link'
 bad_username_or_password = "Bad username or password"
 only_the_user_can_checkout_their_links = "Only the user can checkout their links"
 possible_cross_site_request_forgery_try_again = "Possible cross site request forgery.  Try again."
+only_admins_can_access_debug_pages = "Only admins can access debug pages."
 field_realname = "Real name"
 field_email = "Email"
 field_gravatar_email = "Gravatar email"

@@ -13,7 +13,11 @@ import gc
 import collections
 import json
 import random
+import sys
+import pickle
+import urllib
 
+import memcache
 import web
 import bleach
 from passlib.apps import custom_app_context as pwd_context
@@ -21,6 +25,8 @@ from passlib.apps import custom_app_context as pwd_context
 import strings
 import utils
 import version
+
+web.config.debug = False
 
 # pylint: disable=redefined-builtin
 # pylint: disable=redefined-outer-name
@@ -75,7 +81,7 @@ DEFAULTS = [
             'dateformat': '%B %d, %Y',
             'base': '/',
             'extra_tags': '',
-            'limit': 50,
+            'limit': 20,
             'server_type': 'dev',
             'user_fields': 'realname email homepage gravatar_email team location twitter facebook google_plus_ skype aim',
             'history_days': 7,
@@ -98,6 +104,7 @@ DEFAULTS = [
     ]
 
 counters = utils.Counters()
+
 
 class Config(ConfigParser.RawConfigParser):
     def set_defaults(self, defaults):
@@ -153,6 +160,43 @@ db = web.database(dbn='mysql',
                   db=config.get('db','db'),
                   )
 
+class DBCache:
+    def __init__(self, db):
+        self._db = db
+        self._cache = memcache.Client(['localhost:11211'],
+                                      pickleProtocol=pickle.HIGHEST_PROTOCOL)
+
+    def make_key(self, table, column, value, limit):
+        return '/'.join((
+                table,
+                column,
+                hashlib.md5(str(value)).hexdigest(),
+                str(limit)
+                ))
+
+    def select(self, table, column, value, limit=None):
+        key = self.make_key(table, column, value, limit)
+
+        got = self._cache.get(key)
+        if got is not None:
+            counters.bump('select_cache_hit')
+            return got
+        else:
+            got = list(self._db.select(table, where='%s = $value' % column,
+                                 vars={'value': value}, limit=limit))
+            counters.bump('select_cache_miss')
+            self._cache.set(key, got, time=600)
+            return got
+
+    def update(self, type, id, **kwargs):
+        table = '1_%ss' % type
+        column = '%sID' % type
+        key = self.make_key(table, column, id, 1)
+        self._db.update(table, where='%s = $id' % column, vars={'id': id}, **kwargs)
+        self._cache.delete(key)
+
+cache = DBCache(db)
+
 def require_feature(name):
     if not features[name]:
         raise web.notfound()
@@ -183,7 +227,7 @@ class JSONMapper:
         if value != getattr(self, key):
             self._values[key] = value
             encoded = json.dumps(self._values)
-            db.update('1_users', where='userID = $id', contacts=encoded, vars={'id': self._around.userID})
+            cache.update('user', self._around.userID, contacts=encoded)
 
 class AutoMapper:
     def __init__(self, type, around):
@@ -220,7 +264,7 @@ class AutoMapper:
             assert self._type
             key = '%sID' % self._type
 
-            rows = db.select(table, where='%s = $id' % key, vars={'id': getattr(self, key)})
+            rows = cache.select(table, key, getattr(self, key))
             return [AutoMapper(singular, x) for x in rows]
 
         raise AttributeError(name)
@@ -255,7 +299,7 @@ def first_or_none(type, column, id, strict=False):
     no match.
     """
     table = '1_%ss' % type
-    vs = db.select(table, where='%s = $id' % column, vars={'id': id}, limit=1)
+    vs = cache.select(table, column, id, limit=1)
 
     if len(vs):
         return AutoMapper(type, vs[0])
@@ -322,7 +366,9 @@ class Model:
 
     def get_user_by_name(self, name):
         """Get a user by user name"""
-        return first_or_none('user', 'username', name)
+        name = urllib.unquote(name)
+        user = first('user', 'username', name)
+        return first('user', 'userID', user.userID)
 
     def get_gravatar(self, email):
         """Get the gravatar hash for an email"""
@@ -685,7 +731,7 @@ class hide_link:
         need_admin(_('Admin needed to hide a link'))
 
         next = not link.hidden
-        db.update('1_links', where='linkID = $id', hidden=next, vars={'id': id})
+        cache.update('link', id, hidden=next)
 
         model.inform(_("Link is hidden") if next else _("Link now shows"))
         redirect('/link/%s' % id)
@@ -697,7 +743,7 @@ class close_link:
 
         need_admin(_('Admin needed to close a link'))
         next = not link.closed
-        db.update('1_links', where='linkID = $id', closed=next, vars={'id': id})
+        cache.update('link', id, closed=next)
 
         model.inform(_("Link is closed") if next else _("Link is open"))
         redirect('/link/%s' % id)
@@ -769,21 +815,21 @@ class like_comment:
 class user:
     def GET(self, id):
         counters.bump(self)
-        user = first('user', 'username', id)
-        return render.user(user)
+        target = model.get_user_by_name(id)
+        return render.user(target)
 
 class user_links:
     def GET(self, id):
         counters.bump(self)
-        user = first('user', 'username', id)
-        return render_links(where='userID=$id', vars={'id': user.userID})
+        target = model.get_user_by_name(id)
+        return render_links(where='userID=$id', vars={'id': target.userid})
 
 class user_comments:
     def GET(self, id):
         counters.bump(self)
-        user = first('user', 'username', id)
+        userid = first('user', 'username', id).userID
         comments = db.select('1_comments', where='userID=$id', order='timestamp DESC',
-                             vars={'id': user.userID},
+                             vars={'id': userid},
                              limit=config.get('general', 'limit'))
         return render.user_comments([AutoMapper('comment', x) for x in comments])
 
@@ -874,8 +920,7 @@ class password:
                 form.note = _('Bad password')
                 return render.password(form)
 
-        db.update('1_users', password=pwd_context.encrypt(form.d.new_password), where='userID=$id', vars={'id': target.userID})
-        
+        cache.update('user', target.userID, password=pwd_context.encrypt(form.d.new_password))
         model.inform(_("Password changed"))
         redirect('/user/%s' % name)
 
@@ -917,12 +962,12 @@ class user_edit:
 
         for name in names:
             if target.has(name):
-                db.update('1_users', where='userID = $id', vars={'id': target.userID}, **{name: form[name].value})
+                cache.update('user', target.userID, **{name: form[name].value})
             else:
                 values.set(name, form[name].value)
 
         bio = render_input(form.d.bio)
-        db.update('1_users', bio=bio, where='userID = $id', vars={'id': target.userID})
+        cache.update('user', target.userID, bio=bio)
         redirect('/user/%s' % username)
 
 
@@ -939,7 +984,7 @@ class rss:
 class debug_counters:
     def GET(self):
         counters.bump(self)
-        need_admin('Only admins can access server status pages.')
+        need_admin(_('Only admins can access debug pages.'))
         web.header('Content-Type', 'application/json')
         return json.dumps(counters.get_snapshot())
 

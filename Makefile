@@ -1,5 +1,9 @@
-version.py: Makefile
+all: version.py
+
+version.py: dummy
 	echo __version__ = \'$(shell git describe --always --dirty --long)\' > $@
+
+dummy:
 
 DB=$(shell cat niche.ini | grep ^db= | cut -d= -f2)
 
