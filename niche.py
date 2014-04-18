@@ -53,6 +53,7 @@ urls = (
     r'/newuser', 'newuser',
     r'/rss', 'rss',
     r'/debug/counters', 'debug_counters',
+    r'/debug/diediedie', 'debug_die',
 
     # MonkeyFilter compatible URLs.
     r'/link\.php/(\d+)', 'link',
@@ -987,6 +988,12 @@ class debug_counters:
         need_admin(_('Only admins can access debug pages.'))
         web.header('Content-Type', 'application/json')
         return json.dumps(counters.get_snapshot())
+
+
+class debug_die:
+    def GET(self):
+        need_admin(_('Only admins can access debug pages.'))
+        sys.exit(0)
 
 
 def main():
