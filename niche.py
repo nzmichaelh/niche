@@ -50,7 +50,6 @@ urls = (
     r'/user/([^/]+)/edit', 'user_edit',
     r'/login', 'login',
     r'/logout', 'logout',
-    r'/newuser', 'newuser',
     r'/rss', 'rss',
     r'/debug/counters', 'debug_counters',
     r'/debug/diediedie', 'debug_die',
@@ -94,6 +93,11 @@ DEFAULTS = [
             'db': 'niche',
             'user': 'niche',
             'password': 'whatever',
+            }),
+    ( 'cache', {
+            'host': 'localhost:11211',
+            'max_age': 60,
+            'prefix': 'niche',
             }),
     ( 'site', {
             'name': 'Nichefilter',
@@ -162,13 +166,16 @@ db = web.database(dbn='mysql',
                   )
 
 class DBCache:
-    def __init__(self, db):
+    def __init__(self, db, host, max_age=60, prefix=None):
         self._db = db
-        self._cache = memcache.Client(['localhost:11211'],
+        self._cache = memcache.Client([host],
                                       pickleProtocol=pickle.HIGHEST_PROTOCOL)
+        self._max_age = max_age
+        self._prefix = prefix
 
     def make_key(self, table, column, value, limit):
         return '/'.join((
+                self._prefix,
                 table,
                 column,
                 hashlib.md5(str(value)).hexdigest(),
@@ -179,14 +186,14 @@ class DBCache:
         key = self.make_key(table, column, value, limit)
 
         got = self._cache.get(key)
-        if got is not None:
+        if got is not None and self._max_age:
             counters.bump('select_cache_hit')
             return got
         else:
             got = list(self._db.select(table, where='%s = $value' % column,
                                  vars={'value': value}, limit=limit))
             counters.bump('select_cache_miss')
-            self._cache.set(key, got, time=600)
+            self._cache.set(key, got, time=self._max_age)
             return got
 
     def update(self, type, id, **kwargs):
@@ -196,7 +203,11 @@ class DBCache:
         self._db.update(table, where='%s = $id' % column, vars={'id': id}, **kwargs)
         self._cache.delete(key)
 
-cache = DBCache(db)
+cache = DBCache(db,
+                host=config.get('cache', 'host'),
+                max_age=config.get('cache', 'max_age'),
+                prefix=config.get('cache', 'prefix'))
+
 
 def require_feature(name):
     if not features[name]:
@@ -361,7 +372,7 @@ class Model:
 
     def get_link(self, id):
         """Get a link by link ID"""
-        return first_or_none('link', 'linkID', id)
+        return first('link', 'linkID', id)
 
     def get_comment(self, id):
         """Get a comment by comment ID"""
