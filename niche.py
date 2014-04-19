@@ -96,7 +96,7 @@ DEFAULTS = [
             }),
     ( 'cache', {
             'host': 'localhost:11211',
-            'max_age': 60,
+            'max_age': 15,
             }),
     ( 'site', {
             'name': 'Nichefilter',
@@ -172,6 +172,9 @@ class DBCache:
         self._max_age = max_age
         self._prefix = prefix
 
+    def make_dirty_key(self, table):
+        return '/'.join((self._prefix, table))
+        
     def make_key(self, table, column, value, limit):
         return '/'.join((
                 self._prefix,
@@ -182,25 +185,33 @@ class DBCache:
                 ))
 
     def select(self, table, column, value, limit=None):
-        key = self.make_key(table, column, value, limit)
+        dirty = self.make_dirty_key(table)
+        elem = self.make_key(table, column, value, limit)
+        got = self._cache.get_multi((dirty, elem))
 
-        got = self._cache.get(key)
-        if got is not None and self._max_age:
+        if dirty not in got and elem in got and self._max_age:
             counters.bump('select_cache_hit')
-            return got
+            return got[elem]
         else:
-            got = list(self._db.select(table, where='%s = $value' % column,
+            rows = list(self._db.select(table, where='%s = $value' % column,
                                  vars={'value': value}, limit=limit))
             counters.bump('select_cache_miss')
-            self._cache.set(key, got, time=self._max_age)
-            return got
+            self._cache.set(elem, rows, time=self._max_age)
+            return rows
 
     def update(self, type, id, **kwargs):
         table = '1_%ss' % type
         column = '%sID' % type
-        key = self.make_key(table, column, id, 1)
+        dirty = self.make_dirty_key(table)
         self._db.update(table, where='%s = $id' % column, vars={'id': id}, **kwargs)
-        self._cache.delete(key)
+        self._cache.set(dirty, 1)
+
+    def insert(self, type, **kwargs):
+        table = '1_%ss' % type
+        dirty = self.make_dirty_key(table)
+        result = self._db.insert(table, **kwargs)
+        self._cache.set(dirty, 1)
+        return result
 
 cache = DBCache(db,
                 host=config.get('cache', 'host'),
@@ -728,7 +739,7 @@ class new_link:
 
             return render.new_link(form, preview)
 
-        next = db.insert('1_links',
+        next = cache.insert('link',
                          userID=user.userID,
                          timestamp=now(),
                          title=form.d.title,
@@ -795,7 +806,7 @@ class new_comment:
         if 'preview' in web.input():
             return render.link(link, form, comment)
 
-        db.insert('1_comments',
+        cache.insert('comment',
                   linkID=link.linkID,
                   userID=user.userID,
                   timestamp=now(),
@@ -824,7 +835,7 @@ class like_comment:
         comment = model.get_comment(id)
 
         userID = session.userID
-        db.insert('1_likes', commentID=comment.commentID, userID=userID)
+        cache.insert('like', commentID=comment.commentID, userID=userID)
 
         model.inform(_("Liked"))
         redirect('/link/%s' % comment.linkID)
