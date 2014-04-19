@@ -97,7 +97,6 @@ DEFAULTS = [
     ( 'cache', {
             'host': 'localhost:11211',
             'max_age': 60,
-            'prefix': 'niche',
             }),
     ( 'site', {
             'name': 'Nichefilter',
@@ -206,7 +205,7 @@ class DBCache:
 cache = DBCache(db,
                 host=config.get('cache', 'host'),
                 max_age=config.get('cache', 'max_age'),
-                prefix=config.get('cache', 'prefix'))
+                prefix=config.get('db', 'db'))
 
 
 def require_feature(name):
