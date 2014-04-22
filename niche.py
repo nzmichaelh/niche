@@ -7,10 +7,7 @@ import passlib
 import markdown
 import re
 import time
-import subprocess
 import calendar
-import gc
-import collections
 import json
 import random
 import sys
@@ -77,28 +74,30 @@ ALLOWED_ATTRIBUTES = {
 
 # Default configuration.
 DEFAULTS = [
-    ( 'general', {
+    ('general', {
             'dateformat': '%B %d, %Y',
             'base': '/',
             'extra_tags': '',
             'limit': 20,
             'server_type': 'dev',
-            'user_fields': 'realname email homepage gravatar_email team location twitter facebook google_plus_ skype aim',
+            'user_fields': ('realname email homepage gravatar_email '
+                            'team location twitter facebook '
+                            'google_plus_ skype aim'),
             'history_days': 7,
             }),
-    ( 'groups', {
+    ('groups', {
             'admins': '',
             }),
-    ( 'db', {
+    ('db', {
             'db': 'niche',
             'user': 'niche',
             'password': 'whatever',
             }),
-    ( 'cache', {
+    ('cache', {
             'host': 'localhost:11211',
             'max_age': 15,
             }),
-    ( 'site', {
+    ('site', {
             'name': 'Nichefilter',
             'subtitle': 'of no fixed subtitle',
             'contact': None,
@@ -121,6 +120,7 @@ class Config(ConfigParser.RawConfigParser):
     def getlist(self, section, option):
         return self.get(section, option).split()
 
+
 def read_config():
     """Set up the defaults and read in niche.ini, if any."""
     cfg = Config()
@@ -132,18 +132,23 @@ config = read_config()
 
 FEATURES = 'likes gravatar rss checkout'.split()
 
+
 def get_features(config):
     features = web.utils.Storage()
 
     for feature in FEATURES:
-        features[feature] = config.has_option('features', feature) and config.getboolean('features', feature)
+        features[feature] = False
+        if config.has_option('features', feature):
+            features[feature] = config.getboolean('features', feature)
 
     return features
 
 features = get_features(config)
 
+
 def get_version():
     return version.__version__
+
 
 def get_string(id):
     """Get a string gettext style.  Splits the strings from the
@@ -161,8 +166,9 @@ _ = get_string
 db = web.database(dbn='mysql',
                   user=config.get('db', 'user'),
                   pw=config.get('db', 'password'),
-                  db=config.get('db','db'),
+                  db=config.get('db', 'db'),
                   )
+
 
 class DBCache:
     def __init__(self, db, host, max_age=60, prefix=None):
@@ -174,7 +180,7 @@ class DBCache:
 
     def make_dirty_key(self, table):
         return '/'.join((self._prefix, table))
-        
+
     def make_key(self, table, column, value, limit):
         return '/'.join((
                 self._prefix,
@@ -203,7 +209,9 @@ class DBCache:
         table = '1_%ss' % type
         column = '%sID' % type
         dirty = self.make_dirty_key(table)
-        self._db.update(table, where='%s = $id' % column, vars={'id': id}, **kwargs)
+        self._db.update(table,
+                        where='%s = $id' % column,
+                        vars={'id': id}, **kwargs)
         self._cache.set(dirty, 1)
 
     def insert(self, type, **kwargs):
@@ -223,12 +231,14 @@ def require_feature(name):
     if not features[name]:
         raise web.notfound()
 
+
 def now():
     return time.time()
 
 fallbacks = {
     'user': web.utils.Storage(username='anonymous'),
 }
+
 
 class JSONMapper:
     def __init__(self, around, name):
@@ -250,6 +260,7 @@ class JSONMapper:
             self._values[key] = value
             encoded = json.dumps(self._values)
             cache.update('user', self._around.userID, contacts=encoded)
+
 
 class AutoMapper:
     def __init__(self, type, around):
@@ -282,8 +293,11 @@ class AutoMapper:
 
         if name.endswith('_count'):
             field = name[:-6]
-            query = "SELECT COUNT(*) AS total FROM 1_%ss WHERE %sID = $id" % (field, self._type)
-            results = db.query(query, vars={'id': getattr(self, '%sID' % self._type)})
+            query = ('SELECT COUNT(*) AS total FROM 1_%ss '
+                     'WHERE %sID = $id') % (field, self._type)
+            results = db.query(
+                query,
+                vars={'id': getattr(self, '%sID' % self._type)})
             return results[0].total
 
         if name.endswith('s'):
@@ -319,8 +333,10 @@ class AutoMapper:
         date = self.to_date()
         return '%04d/%02d/%02d' % (date.year, date.month, date.day)
 
+
 def map_all(type, results):
     return [AutoMapper(type, x) for x in results]
+
 
 def first_or_none(type, column, id, strict=False):
     """Get the first item in the table that matches or None if there's
@@ -336,12 +352,15 @@ def first_or_none(type, column, id, strict=False):
     else:
         return None
 
+
 def first(type, column, id):
     """Get the first matching item in the table or raise not found."""
     return first_or_none(type, column, id, strict=True)
 
+
 def linkify(text):
     return bleach.clean(bleach.linkify(text, parse_email=True))
+
 
 def render_input(v, use_markdown=False):
     """Tidy up user input and insert breaks for empty lines."""
@@ -364,11 +383,13 @@ def render_input(v, use_markdown=False):
 
         return out
 
+
 class Model:
     """Top level helpers.  Exposed to scripts."""
     def is_admin(self):
         id = session.get('userID', None)
-        return id != None and (str(id) in config.getlist('groups', 'admins'))
+        admins = config.getlist('groups', 'admins')
+        return id is not None and (str(id) in admins)
 
     def is_user_or_admin(self, user_id):
         id = session.get('userID', None)
@@ -435,7 +456,9 @@ class Model:
             if pages / step <= 6:
                 break
         if pages > 1:
-            indexes = set([1, 2, pages, pages-1, page] + range(step, pages, step))
+            indexes = set(
+                [1, 2, pages, pages-1, page]
+                + range(step, pages, step))
             if page > 1:
                 indexes.add(page-1)
             if page < pages:
@@ -445,7 +468,9 @@ class Model:
         return page, sorted(indexes)
 
     def to_rss_date(self, timestamp):
-        return datetime.datetime.fromtimestamp(timestamp).strftime('%a, %d %b %Y %H:%M:%S +0000')
+        fmt = '%a, %d %b %Y %H:%M:%S +0000'
+        asdate = datetime.datetime.fromtimestamp(timestamp)
+        return asdate.strftime(fmt)
 
     def field_text(self, name):
         return get_string('field_%s' % name)
@@ -459,7 +484,12 @@ class Model:
 
     def get_new(self):
         since = now() - 60*60*24*config.get('general', 'history_days')
-        comments = db.select('1_comments', where='timestamp >= $since AND userID <> $user', order='timestamp ASC', limit=50, vars={'since': since, 'user': session.get('userID', None)})
+        comments = db.select(
+            '1_comments',
+            where='timestamp >= $since AND userID <> $user',
+            order='timestamp ASC', limit=50,
+            vars={'since': since,
+                  'user': session.get('userID', None)})
         # Pull out the unique links.
         ids = {}
         for comment in comments:
@@ -492,6 +522,7 @@ naked_render = web.template.render(
 
 app = web.application(urls, locals())
 
+
 def get_csrf():
     token = session.get('csrf_token', None)
     if token is None:
@@ -504,6 +535,7 @@ def get_csrf():
         session.csrf_token = token
     return token
 
+
 def check_csrf(value):
     expect = session.get('csrf_token', None)
 
@@ -512,6 +544,7 @@ def check_csrf(value):
         return False
     else:
         return True
+
 
 class CSRFInput(web.form.Hidden):
     def __init__(self):
@@ -530,15 +563,17 @@ class CSRFInput(web.form.Hidden):
 TEXT_SIZE = 80
 TEXT_MAX_LENGTH = 150
 
+
 def tidy_form(form):
     for input in form.inputs:
         if not isinstance(input, CSRFInput):
             input.description = get_string('field_%s' % input.name)
 
-        if isinstance(input, web.form.Textbox) or isinstance(input, web.form.Password):
+        if isinstance(input, (web.form.Textbox, web.form.Password)):
             input.attrs['size'] = TEXT_SIZE
             input.attrs['maxlength'] = TEXT_MAX_LENGTH
     return form
+
 
 def make_session():
     """Helper that makes the session object, even if in debug mode."""
@@ -555,7 +590,10 @@ def make_session():
 session = make_session()
 
 # Validate a password.  Pretty lax.
-password_validator = web.form.Validator(_("Short password"), lambda x: len(x) >= 3)
+password_validator = web.form.Validator(
+    _("Short password"),
+    lambda x: len(x) >= 3)
+
 
 def url_validator(v):
     if not v:
@@ -563,24 +601,29 @@ def url_validator(v):
 
     return re.match('(http|https|ftp|mailto)://.+', v)
 
+
 def redirect(url):
     """Bounce to a different site absolute URL."""
     raise web.seeother(url)
 
+
 def authenticate(msg=_("Login required")):
     if not session.get('userID', None):
         model.inform(msg)
-        redirect('/login')            
+        redirect('/login')
+
 
 def need_admin(msg):
     if not model.is_admin():
         model.inform(msg)
-        redirect('/login')            
+        redirect('/login')
+
 
 def need_user_or_admin(id, msg):
     if not model.is_user_or_admin(id):
         model.inform(msg)
-        redirect('/login')            
+        redirect('/login')
+
 
 def check_password(got, user):
     if user is None:
@@ -591,6 +634,7 @@ def check_password(got, user):
     except ValueError:
         return pwd_context.verify(got, user.password)
 
+
 def error(message, condition, target='/'):
     """Log an error if condition is true and bounce to somewhere."""
     if condition:
@@ -598,7 +642,10 @@ def error(message, condition, target='/'):
         model.inform(message)
         redirect(target)
 
-def render_links(where=None, span=None, vars={}, date_range=None):
+
+def render_links(where=None, span=None, vars=None, date_range=None):
+    vars = vars or {}
+
     input = web.input()
     offset = int(input.get('offset', 0))
     offset = max(offset, 0)
@@ -606,21 +653,29 @@ def render_links(where=None, span=None, vars={}, date_range=None):
     limit = int(input.get('limit', config.get('general', 'limit')))
     limit = max(0, min(200, limit))
 
-    links = db.select('1_links', where=where, vars=vars, limit=limit, offset=offset, order="timestamp DESC")
+    links = db.select('1_links', where=where, vars=vars,
+                      limit=limit, offset=offset,
+                      order="timestamp DESC")
 
     if where:
-        results = db.query("SELECT COUNT(*) AS total FROM 1_links WHERE %s" % where, vars=vars)
+        results = db.query(
+            'SELECT COUNT(*) AS total FROM 1_links WHERE %s' % where,
+            vars=vars)
     else:
         results = db.query("SELECT COUNT(*) AS total FROM 1_links")
 
     total = results[0].total
 
-    return render.links(map_all('link', links), span, web.ctx.path, offset, limit, total, date_range)
+    return render.links(map_all('link', links), span,
+                        web.ctx.path, offset, limit,
+                        total, date_range)
+
 
 class index:
     def GET(self):
         counters.bump(self)
         return render_links()
+
 
 class links:
     def GET(self, year, month, day):
@@ -665,7 +720,8 @@ class links:
         tend = time.mktime(end.timetuple())
 
         # Pull the oldest and youngest from the database.
-        limits = db.query('SELECT MIN(timestamp) as first, MAX(timestamp) as last FROM 1_links')
+        limits = db.query(('SELECT MIN(timestamp) as first, MAX(timestamp) '
+                           'as last FROM 1_links'))
         limits = limits[0]
         first = datetime.datetime.fromtimestamp(limits.first)
         last = datetime.datetime.fromtimestamp(limits.last)
@@ -678,11 +734,12 @@ class links:
             )
 
         return render_links(
-            where='timestamp >= $tstart and timestamp < $tend', 
-            vars={ 'tstart': tstart, 'tend': tend },
+            where='timestamp >= $tstart and timestamp < $tend',
+            vars={'tstart': tstart, 'tend': tend},
             span=span,
             date_range=date_range,
             )
+
 
 class link:
     def GET(self, id):
@@ -691,18 +748,24 @@ class link:
         form = new_comment.form()
         return render.link(link, form, False)
 
+
 class new_link:
     form = web.form.Form(
         web.form.Textbox('title', web.form.notnull),
-        web.form.Textbox('url', web.form.Validator(_("Not a URL"), url_validator)),
+        web.form.Textbox('url', web.form.Validator(
+                _("Not a URL"), url_validator)),
         web.form.Textbox('url_description'),
         web.form.Textarea('description', rows=5, cols=80),
         web.form.Textarea('extended', rows=5, cols=80),
         web.form.Checkbox('use_markdown', value='use_markdown'),
         CSRFInput(),
-        validators = [
-            web.form.Validator(_("URLs need a description"), lambda x: x.url_description if x.url else True),
-            web.form.Validator(_("Need a URL or description"), lambda x: x.url or x.description),
+        validators=[
+            web.form.Validator(
+                _("URLs need a description"),
+                lambda x: x.url_description if x.url else True),
+            web.form.Validator(
+                _("Need a URL or description"),
+                lambda x: x.url or x.description),
             ]
         )
     form = tidy_form(form)
@@ -740,17 +803,18 @@ class new_link:
             return render.new_link(form, preview)
 
         next = cache.insert('link',
-                         userID=user.userID,
-                         timestamp=now(),
-                         title=form.d.title,
-                         URL=form.d.url,
-                         URL_description=url_description,
-                         description=description,
-                         extended=extended
-                         )
+                            userID=user.userID,
+                            timestamp=now(),
+                            title=form.d.title,
+                            URL=form.d.url,
+                            URL_description=url_description,
+                            description=description,
+                            extended=extended
+                            )
 
         model.inform(_("New post success"))
         redirect('/link/%d' % next)
+
 
 class hide_link:
     def GET(self, id):
@@ -764,6 +828,7 @@ class hide_link:
         model.inform(_("Link is hidden") if next else _("Link now shows"))
         redirect('/link/%s' % id)
 
+
 class close_link:
     def GET(self, id):
         counters.bump(self)
@@ -775,6 +840,7 @@ class close_link:
 
         model.inform(_("Link is closed") if next else _("Link is open"))
         redirect('/link/%s' % id)
+
 
 class new_comment:
     form = web.form.Form(
@@ -807,13 +873,14 @@ class new_comment:
             return render.link(link, form, comment)
 
         cache.insert('comment',
-                  linkID=link.linkID,
-                  userID=user.userID,
-                  timestamp=now(),
-                  content=comment
-                  )
+                     linkID=link.linkID,
+                     userID=user.userID,
+                     timestamp=now(),
+                     content=comment
+                     )
         model.inform(_("New comment success"))
         redirect('/link/%d' % link.linkID)
+
 
 class delete_comment:
     def GET(self, id):
@@ -825,6 +892,7 @@ class delete_comment:
 
         model.inform(_("Comment deleted"))
         redirect('/link/%s' % comment.linkID)
+
 
 class like_comment:
     def GET(self, id):
@@ -840,11 +908,13 @@ class like_comment:
         model.inform(_("Liked"))
         redirect('/link/%s' % comment.linkID)
 
+
 class user:
     def GET(self, id):
         counters.bump(self)
         target = model.get_user_by_name(id)
         return render.user(target)
+
 
 class user_links:
     def GET(self, id):
@@ -852,24 +922,30 @@ class user_links:
         target = model.get_user_by_name(id)
         return render_links(where='userID=$id', vars={'id': target.userid})
 
+
 class user_comments:
     def GET(self, id):
         counters.bump(self)
         userid = first('user', 'username', id).userID
-        comments = db.select('1_comments', where='userID=$id', order='timestamp DESC',
-                             vars={'id': userid},
-                             limit=config.get('general', 'limit'))
-        return render.user_comments([AutoMapper('comment', x) for x in comments])
+        comments = db.select(
+            '1_comments', where='userID=$id',
+            order='timestamp DESC', vars={'id': userid},
+            limit=config.get('general', 'limit'))
+        return render.user_comments(
+            [AutoMapper('comment', x) for x in comments])
+
 
 class checkout:
     def GET(self, name):
         counters.bump(self)
         require_feature('checkout')
         user = model.get_user_by_name(name)
-        need_user_or_admin(user.userID, _('Only the user can checkout their links'))
+        need_user_or_admin(user.userID,
+                           _('Only the user can checkout their links'))
 
         web.header('Content-Type', 'application/xml')
         return naked_render.rss(user.links, web.ctx.home)
+
 
 class login:
     login = web.form.Form(
@@ -903,6 +979,7 @@ class login:
         counters.bump(self, 'ok')
         redirect('/')
 
+
 class logout:
     def GET(self):
         counters.bump(self)
@@ -911,14 +988,18 @@ class logout:
         model.inform(_("Logged out"))
         redirect('/')
 
+
 class password:
     form = web.form.Form(
         web.form.Password('password', web.form.notnull),
-        web.form.Password('new_password', web.form.notnull, password_validator),
+        web.form.Password('new_password',
+                          web.form.notnull, password_validator),
         web.form.Password('again', web.form.notnull),
         CSRFInput(),
         validators=[
-            web.form.Validator(_("Passwords don't match"), lambda x: x.new_password == x.again)
+            web.form.Validator(
+                _("Passwords don't match"),
+                lambda x: x.new_password == x.again)
             ]
         )
     form = tidy_form(form)
@@ -948,9 +1029,11 @@ class password:
                 form.note = _('Bad password')
                 return render.password(form)
 
-        cache.update('user', target.userID, password=pwd_context.encrypt(form.d.new_password))
+        cache.update('user', target.userID,
+                     password=pwd_context.encrypt(form.d.new_password))
         model.inform(_("Password changed"))
         redirect('/user/%s' % name)
+
 
 class user_edit:
     def make_form(self, user):
@@ -962,7 +1045,8 @@ class user_edit:
             return value if value else user.get(name)
 
         fields = [web.form.Textbox(x, value=get(x), size=60) for x in names]
-        fields.append(web.form.Textarea('bio', rows=5, cols=80, value=get('bio')))
+        fields.append(web.form.Textarea('bio',
+                                        rows=5, cols=80, value=get('bio')))
         fields.append(CSRFInput())
         return tidy_form(web.form.Form(*fields))
 
