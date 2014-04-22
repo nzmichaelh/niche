@@ -367,6 +367,12 @@ def render_input(v, use_markdown=False):
     tags = ALLOWED_TAGS + config.getlist('general', 'extra_tags')
     attrs = ALLOWED_ATTRIBUTES
 
+    # Drop any trailing empty lines.
+    v = v.rstrip()
+
+    if not v:
+        return v
+
     if use_markdown:
         return bleach.clean(
             markdown.markdown(v, output_format='html5'),
