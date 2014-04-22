@@ -421,7 +421,7 @@ class Model:
 
     def get_user_by_name(self, name):
         """Get a user by user name"""
-        name = urllib.unquote(name)
+        name = urllib.unquote_plus(name)
         user = first('user', 'username', name)
         return first('user', 'userID', user.userID)
 
